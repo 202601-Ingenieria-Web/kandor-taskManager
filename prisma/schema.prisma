@@ -98,7 +98,7 @@ model Product {
   enabled Boolean @default(true)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-  suppliers Supplier[] @relation("ProductSuppliers", references: [id])
+  suppliers Supplier[]
   orderItems OrderItem[]
 }
 

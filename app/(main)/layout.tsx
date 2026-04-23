@@ -5,6 +5,7 @@ import { cn } from '@/lib/utils';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { SidebarInset, SidebarProvider } from '@/components/ui/sidebar';
 import { AppSidebar } from '@/components/app-sidebar';
+import { Toaster } from '@/components/ui/sonner';
 
 const publicSans = Public_Sans({ subsets: ['latin'], variable: '--font-sans' });
 
@@ -52,7 +53,10 @@ export default function RootLayout({
             }
           >
             <AppSidebar variant='inset' />
-            <SidebarInset>{children}</SidebarInset>
+            <SidebarInset>
+              {children}
+              <Toaster />
+            </SidebarInset>
           </SidebarProvider>
         </TooltipProvider>
       </body>

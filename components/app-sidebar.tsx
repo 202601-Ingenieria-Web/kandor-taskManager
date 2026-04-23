@@ -65,6 +65,11 @@ const data = {
       url: '/suppliers',
       icon: <HugeiconsIcon icon={UserGroupIcon} strokeWidth={2} />,
     },
+    {
+      title: 'Users',
+      url: '/users',
+      icon: <HugeiconsIcon icon={CommandIcon} strokeWidth={2} />,
+    },
   ],
   navClouds: [
     {
