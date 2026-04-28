@@ -36,41 +36,76 @@ const formSchema = z.object({
 
 export function BugReportForm() {
   const params = useParams<{ id: string }>();
-  console.log('params :>> ', params);
+  const [userData, setUserData] = React.useState<{
+    name: string;
+    email: string;
+    image: string;
+    role: 'ADMIN' | 'USER';
+    enabled: boolean;
+  } | null>(null);
+
+  async function fetchUserData(userId: string) {
+    try {
+      const response = await fetch(`/api/user?id=${userId}`);
+      if (!response.ok) {
+        throw new Error('Failed to fetch user data');
+      }
+      const data = await response.json();
+      return data.user;
+    } catch (error) {
+      console.error('Error fetching user data:', error);
+      toast.error('Failed to load user data. Please try again.');
+      return null;
+    }
+  }
+  React.useEffect(() => {
+    if (params.id) {
+      fetchUserData(params.id).then((data) => {
+        if (data) {
+          setUserData(data);
+        }
+      });
+    }
+  }, [params.id]);
+
   const form = useForm({
     defaultValues: {
-      name: '',
-      email: '',
-      image: '',
-      role: 'USER',
-      enabled: false,
+      name: userData ? userData.name : '',
+      email: userData ? userData.email : '',
+      image: userData ? userData.image : '',
+      role: userData ? userData.role : 'USER',
+      enabled: userData ? userData.enabled : false,
     },
     validators: {
       onSubmit: formSchema,
     },
     onSubmit: async ({ value }) => {
-      console.log('Form submitted with values:', value);
       setLoading(true);
+
+      const data = {
+        id: params.id,
+        ...value,
+      };
       try {
         const response = await fetch('/api/user', {
-          method: 'POST',
+          method: 'PUT',
           headers: {
             'Content-Type': 'application/json',
           },
-          body: JSON.stringify({ user: value }),
+          body: JSON.stringify({ user: data }),
         }).then((res) => {
-          toast.success('User created successfully!');
+          toast.success('User update successfully!');
           setLoading(false);
           return res;
         });
 
         if (!response.ok) {
-          throw new Error('Failed to create user');
+          throw new Error('Failed to update user');
           setLoading(false);
         }
       } catch (error) {
         console.error('Error submitting form:', error);
-        toast.error('Failed to create user. Please try again.');
+        toast.error('Failed to update user. Please try again.');
         setLoading(false);
       }
     },

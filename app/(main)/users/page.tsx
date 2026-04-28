@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 
 async function getData(): Promise<User[]> {
-  const response = await fetch('http://localhost:3000/api/user');
+  const response = await fetch('http://localhost:3000/api/users');
   const data = await response.json();
 
   return data.users;

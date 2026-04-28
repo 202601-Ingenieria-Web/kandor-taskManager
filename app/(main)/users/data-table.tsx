@@ -13,6 +13,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Pencil, Trash } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
+import Delete from '@/components/delete-dialog/Index';
 
 interface DataTableProps<TData, TValue> {
   columns: any;
@@ -62,9 +63,7 @@ export function DataTable<User, TValue>({ columns, data }: DataTableProps<User, 
                         <Pencil />
                       </Link>
                     </Button>
-                    <Button variant='outline' size='icon'>
-                      <Trash />
-                    </Button>
+                    <Delete id={row.id} name={row.name} />
                   </div>
                 </TableCell>
               </TableRow>

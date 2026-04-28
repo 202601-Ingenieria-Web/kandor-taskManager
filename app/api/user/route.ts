@@ -3,7 +3,6 @@ import prisma from '@/lib/prisma';
 
 export async function POST(request: NextRequest): Promise<NextResponse> {
   const { user } = await request.json();
-  console.log('user :>> ', user);
   try {
     const createdUser = await prisma.user.create({
       data: {
@@ -21,14 +20,68 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 }
 
 export async function GET(request: NextRequest): Promise<NextResponse> {
+  const { searchParams } = new URL(request.url);
+  const userId = searchParams.get('id');
+
+  if (!userId) {
+    return NextResponse.json({ error: 'User ID is required' }, { status: 400 });
+  } else {
+    try {
+      const user = await prisma.user.findUnique({
+        where: {
+          id: userId,
+        },
+      });
+      if (!user) {
+        return NextResponse.json({ error: 'User not found' }, { status: 404 });
+      }
+      return NextResponse.json({ user }, { status: 200 });
+    } catch (error) {
+      console.error('Error fetching user:', error);
+      return NextResponse.json({ error: 'Failed to fetch user' }, { status: 500 });
+    }
+  }
+}
+export async function PUT(request: NextRequest): Promise<NextResponse> {
+  const { user } = await request.json();
+
   try {
-    const users = await prisma.user.findMany();
-    return NextResponse.json({ users }, { status: 200 });
+    const updatedUser = await prisma.user.update({
+      where: {
+        id: user.id,
+      },
+      data: {
+        name: user.name,
+        image: user.image,
+        email: user.email,
+        role: user.role,
+        enabled: user.enabled,
+      },
+    });
+    return NextResponse.json({ user: updatedUser }, { status: 200 });
   } catch (error) {
-    console.error('Error fetching users:', error);
-    return NextResponse.json({ error: 'Failed to fetch users' }, { status: 500 });
+    console.error('Error updating user:', error);
+    return NextResponse.json({ error: 'Failed to update user' }, { status: 500 });
   }
 }
 
-// Here you would typically handle the user creation logic, such as validating the input,
-// hashing the password, and saving the user to a database. For this example, we'll just return the user data as a response.
+export async function DELETE(request: NextRequest): Promise<NextResponse> {
+  const { searchParams } = new URL(request.url);
+  const userId = searchParams.get('id');
+
+  if (!userId) {
+    return NextResponse.json({ error: 'User ID is required' }, { status: 400 });
+  } else {
+    try {
+      await prisma.user.delete({
+        where: {
+          id: userId,
+        },
+      });
+      return NextResponse.json({ message: 'User deleted successfully' }, { status: 200 });
+    } catch (error) {
+      console.error('Error deleting user:', error);
+      return NextResponse.json({ error: 'Failed to delete user' }, { status: 500 });
+    }
+  }
+}

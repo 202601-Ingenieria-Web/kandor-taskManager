@@ -46,7 +46,6 @@ export function BugReportForm() {
       onSubmit: formSchema,
     },
     onSubmit: async ({ value }) => {
-      console.log('Form submitted with values:', value);
       setLoading(true);
       try {
         const response = await fetch('/api/user', {
