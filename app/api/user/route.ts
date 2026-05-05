@@ -3,6 +3,7 @@ import prisma from '@/lib/prisma';
 
 export async function POST(request: NextRequest): Promise<NextResponse> {
   const { user } = await request.json();
+
   try {
     const createdUser = await prisma.user.create({
       data: {
