@@ -5,7 +5,7 @@ import prisma from '@/lib/prisma';
 
 const projectInclude = {
   members: {
-    where: { status: 'ACTIVE' as const },
+    where: { status: { in: ['ACTIVE' as const, 'LEAVE_REQUESTED' as const] } },
     include: { user: { select: { id: true, name: true, email: true } } },
   },
   tasks: {

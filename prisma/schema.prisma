@@ -37,6 +37,7 @@ enum Enum_ProjectMemberRole {
 enum Enum_MembershipStatus {
   ACTIVE
   PENDING
+  LEAVE_REQUESTED
 }
 
 enum Enum_ProjectStatus {

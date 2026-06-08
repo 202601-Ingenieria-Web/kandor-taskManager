@@ -63,7 +63,17 @@ export function ProjectsClient({ role, userId }: { role: string; userId: string 
 
   const [memberOpen, setMemberOpen] = useState(false)
   const [memberProject, setMemberProject] = useState<Project | null>(null)
-  const [memberLoading, setMemberLoading] = useState(false)
+
+  const [editTaskOpen, setEditTaskOpen] = useState(false)
+  const [editingTask, setEditingTask] = useState<Task | null>(null)
+  const [editTaskTitle, setEditTaskTitle] = useState('')
+  const [editTaskDesc, setEditTaskDesc] = useState('')
+  const [editTaskPriority, setEditTaskPriority] = useState('MEDIUM')
+  const [editTaskStatus, setEditTaskStatus] = useState('BACKLOG')
+  const [editTaskDue, setEditTaskDue] = useState('')
+  const [editTaskHours, setEditTaskHours] = useState('')
+  const [editTaskAssign, setEditTaskAssign] = useState('')
+  const [savingTask, setSavingTask] = useState(false)
 
   const [proposals, setProposals] = useState<Project[]>([])
   const [proposalsOpen, setProposalsOpen] = useState(false)
@@ -78,7 +88,17 @@ export function ProjectsClient({ role, userId }: { role: string; userId: string 
     setLoading(true)
     fetch('/api/projects')
       .then((r) => r.json())
-      .then((d) => setProjects(d.projects || []))
+      .then((d) => {
+        const ps = d.projects || []
+        setProjects(ps)
+        setMemberProject(prev => {
+          if (prev) {
+            const updated = ps.find((p: Project) => p.id === prev.id)
+            return updated || prev
+          }
+          return prev
+        })
+      })
       .catch(() => toast.error('Error al cargar proyectos'))
       .finally(() => setLoading(false))
   }, [])
@@ -169,7 +189,7 @@ export function ProjectsClient({ role, userId }: { role: string; userId: string 
   }
 
   async function handleLeave(projectId: string) {
-    if (!confirm('¿Salir del proyecto?')) return
+    if (!confirm('¿Solicitar salir del proyecto?')) return
     try {
       const res = await fetch('/api/projects/leave', {
         method: 'POST',
@@ -177,9 +197,23 @@ export function ProjectsClient({ role, userId }: { role: string; userId: string 
         body: JSON.stringify({ projectId }),
       })
       if (!res.ok) throw new Error()
-      toast.success('Has salido del proyecto')
+      const data = await res.json()
+      toast.success(data.message)
       fetchProjects()
-    } catch { toast.error('Error al salir') }
+    } catch { toast.error('Error al solicitar salida') }
+  }
+
+  async function handleProcessLeave(projectId: string, targetUserId: string, approve: boolean) {
+    try {
+      const res = await fetch('/api/projects/leave', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ projectId, userId: targetUserId, approve }),
+      })
+      if (!res.ok) throw new Error()
+      toast.success(approve ? 'Salida aprobada, tareas desasignadas' : 'Solicitud rechazada')
+      fetchProjects()
+    } catch { toast.error('Error al procesar solicitud') }
   }
 
   async function handleLeaderRequest(projectId: string) {
@@ -281,6 +315,45 @@ export function ProjectsClient({ role, userId }: { role: string; userId: string 
     } catch { toast.error('Error al mover tarea') }
   }
 
+  function handleTaskClick(task: Task) {
+    setEditingTask(task)
+    setEditTaskTitle(task.title)
+    setEditTaskDesc(task.description || '')
+    setEditTaskPriority(task.priority)
+    setEditTaskStatus(task.status)
+    setEditTaskDue(task.dueDate ? task.dueDate.split('T')[0] : '')
+    setEditTaskHours(task.estimatedHours?.toString() || '')
+    setEditTaskAssign(task.assignments?.[0]?.user?.id || '')
+    setEditTaskOpen(true)
+  }
+
+  async function handleEditTaskSave() {
+    if (!editingTask || !editTaskTitle) return
+    setSavingTask(true)
+    try {
+      const res = await fetch('/api/tasks', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: editingTask.id,
+          title: editTaskTitle,
+          description: editTaskDesc || null,
+          priority: editTaskPriority,
+          status: editTaskStatus,
+          dueDate: editTaskDue || null,
+          estimatedHours: editTaskHours ? Number(editTaskHours) : null,
+          assigneeIds: editTaskAssign && editTaskAssign.trim() ? [editTaskAssign] : [],
+        }),
+      })
+      if (!res.ok) throw new Error()
+      toast.success('Tarea actualizada')
+      setEditTaskOpen(false)
+      setEditingTask(null)
+      fetchProjects()
+    } catch { toast.error('Error al guardar tarea') }
+    finally { setSavingTask(false) }
+  }
+
   const sortedProjects = [...projects].sort((a, b) => {
     const aMember = a.isMember ? 0 : 1
     const bMember = b.isMember ? 0 : 1
@@ -325,8 +398,8 @@ export function ProjectsClient({ role, userId }: { role: string; userId: string 
         return (
           <div key={project.id} className="border rounded-lg overflow-hidden">
             <div
-              className="flex items-center justify-between p-4 cursor-pointer hover:bg-muted/50 transition-colors"
-              onClick={() => setExpandedId(isExpanded ? null : project.id)}
+              className={`flex items-center justify-between p-4 ${isAdmin || isMember ? 'cursor-pointer hover:bg-muted/50 transition-colors' : ''}`}
+              onClick={() => { if (isAdmin || isMember) setExpandedId(isExpanded ? null : project.id) }}
             >
               <div className="flex items-center gap-3">
                 {project.color && <span className="size-4 rounded-full" style={{ backgroundColor: project.color }} />}
@@ -356,18 +429,28 @@ export function ProjectsClient({ role, userId }: { role: string; userId: string 
                     setEditDesc(project.description || ''); setEditColor(project.color || '#3b82f6'); setEditOpen(true)
                   }}>Editar</Button>
                 )}
-                {canEdit && (
-                  <Button size="sm" variant="outline" onClick={() => {
-                    setMemberProject(project); setMemberOpen(true)
-                  }}>Miembros</Button>
-                )}
+                {canEdit && (() => {
+                  const leaveCount = project.members?.filter((m) => m.status === 'LEAVE_REQUESTED').length || 0
+                  return (
+                    <Button size="sm" variant="outline" onClick={() => {
+                      setMemberProject(project); setMemberOpen(true)
+                    }} className="relative">
+                      Miembros
+                      {leaveCount > 0 && (
+                        <span className="absolute -top-1.5 -right-1.5 size-5 rounded-full bg-yellow-500 text-white text-[10px] font-bold flex items-center justify-center">
+                          {leaveCount}
+                        </span>
+                      )}
+                    </Button>
+                  )
+                })()}
                 {isAdmin && (
                   <Button size="sm" variant="destructive" onClick={() => handleDelete(project.id)}>Eliminar</Button>
                 )}
               </div>
             </div>
 
-            {isExpanded && (
+            {(isAdmin || isMember) && isExpanded && (
               <div className="border-t p-4">
                 <div className="grid grid-cols-1 md:grid-cols-5 gap-3 min-h-[200px]">
                   {statuses.map((status) => (
@@ -384,7 +467,8 @@ export function ProjectsClient({ role, userId }: { role: string; userId: string 
                             key={task.id}
                             draggable={isMember}
                             onDragStart={() => isMember && handleDragStart(task.id, status)}
-                            className={`bg-card border rounded-lg p-3 shadow-sm hover:shadow-md transition-shadow${isMember ? ' cursor-grab active:cursor-grabbing' : ''}`}
+                            onClick={() => handleTaskClick(task)}
+                            className={`bg-card border rounded-lg p-3 shadow-sm hover:shadow-md transition-shadow cursor-pointer${isMember ? ' cursor-grab active:cursor-grabbing' : ''}`}
                           >
                             <p className="text-sm font-medium">{task.title}</p>
                             <div className="mt-1.5 space-y-0.5 text-xs text-muted-foreground">
@@ -450,6 +534,15 @@ export function ProjectsClient({ role, userId }: { role: string; userId: string 
                 )}
               </div>
             ))}
+            {memberProject?.members?.filter((m) => m.status === 'LEAVE_REQUESTED').map((m) => (
+              <div key={m.id} className="flex items-center justify-between bg-yellow-50 dark:bg-yellow-950/20 rounded p-2">
+                <span className="text-sm">{m.user.name} <span className="text-muted-foreground">(solicita salir)</span></span>
+                <div className="flex gap-1">
+                  <Button size="sm" onClick={() => handleProcessLeave(memberProject.id, m.user.id, true)}>Aceptar</Button>
+                  <Button size="sm" variant="outline" onClick={() => handleProcessLeave(memberProject.id, m.user.id, false)}>Rechazar</Button>
+                </div>
+              </div>
+            ))}
             <div className="border-t pt-3">
               <FieldLabel>Agregar miembro</FieldLabel>
               <div className="flex gap-2 mt-1">
@@ -464,6 +557,53 @@ export function ProjectsClient({ role, userId }: { role: string; userId: string 
               </div>
             </div>
           </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={editTaskOpen} onOpenChange={(o) => { if (!o) { setEditTaskOpen(false); setEditingTask(null) } }}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader><DialogTitle>Editar Tarea</DialogTitle></DialogHeader>
+          <div className="space-y-4 py-4 max-h-[70vh] overflow-y-auto">
+            <Field><FieldLabel>Título</FieldLabel><Input value={editTaskTitle} onChange={(e) => setEditTaskTitle(e.target.value)} /></Field>
+            <Field><FieldLabel>Descripción</FieldLabel><Textarea value={editTaskDesc} onChange={(e) => setEditTaskDesc(e.target.value)} /></Field>
+            <Field>
+              <FieldLabel>Prioridad</FieldLabel>
+              <Select value={editTaskPriority} onValueChange={setEditTaskPriority}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="LOW">Baja</SelectItem>
+                  <SelectItem value="MEDIUM">Media</SelectItem>
+                  <SelectItem value="HIGH">Alta</SelectItem>
+                  <SelectItem value="CRITICAL">Crítica</SelectItem>
+                </SelectContent>
+              </Select>
+            </Field>
+            <Field>
+              <FieldLabel>Estado</FieldLabel>
+              <Select value={editTaskStatus} onValueChange={setEditTaskStatus}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {statuses.map((s) => <SelectItem key={s} value={s}>{statusLabels[s]}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </Field>
+            <Field><FieldLabel>Fecha de vencimiento</FieldLabel><Input type="date" value={editTaskDue} onChange={(e) => setEditTaskDue(e.target.value)} /></Field>
+            <Field><FieldLabel>Horas estimadas</FieldLabel><Input type="number" value={editTaskHours} onChange={(e) => setEditTaskHours(e.target.value)} min="0" /></Field>
+            <Field>
+              <FieldLabel>Asignado a</FieldLabel>
+              <Select value={editTaskAssign} onValueChange={setEditTaskAssign}>
+                <SelectTrigger><SelectValue placeholder="Sin asignar" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value=" ">Sin asignar</SelectItem>
+                  {allUsers.map((u) => <SelectItem key={u.id} value={u.id}>{u.name}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </Field>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setEditTaskOpen(false); setEditingTask(null) }}>Cancelar</Button>
+            <Button onClick={handleEditTaskSave} disabled={savingTask}>{savingTask ? 'Guardando...' : 'Guardar'}</Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 
