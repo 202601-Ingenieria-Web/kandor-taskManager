@@ -57,20 +57,18 @@ export async function PUT(request: NextRequest) {
   const existing = await prisma.task.findUnique({ where: { id } });
   if (!existing || existing.deleted) return NextResponse.json({ error: 'Task not found' }, { status: 404 });
 
-  await prisma.task.update({
-    where: { id },
-    data: {
-      title,
-      description,
-      status,
-      priority,
-      dueDate: dueDate ? new Date(dueDate) : null,
-      estimatedHours: estimatedHours ? parseFloat(estimatedHours) : null,
-      projectId: projectId || null,
-    },
-  });
+  const updateData: Record<string, unknown> = {};
+  if (title !== undefined) updateData.title = title;
+  if (description !== undefined) updateData.description = description;
+  if (status !== undefined) updateData.status = status;
+  if (priority !== undefined) updateData.priority = priority;
+  if (dueDate !== undefined) updateData.dueDate = dueDate ? new Date(dueDate) : null;
+  if (estimatedHours !== undefined) updateData.estimatedHours = estimatedHours ? parseFloat(estimatedHours) : null;
+  if (projectId !== undefined) updateData.projectId = projectId || null;
 
-  if (assigneeIds) {
+  await prisma.task.update({ where: { id }, data: updateData });
+
+  if (assigneeIds !== undefined) {
     await prisma.taskAssignment.deleteMany({ where: { taskId: id } });
     if (assigneeIds.length > 0) {
       await prisma.taskAssignment.createMany({

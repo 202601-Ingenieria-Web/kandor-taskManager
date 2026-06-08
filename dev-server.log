@@ -1,0 +1,13 @@
+Ôû▓ Next.js 16.2.2 (Turbopack)
+- Local:         http://localhost:3000
+- Network:       http://192.168.56.1:3000
+- Environments: .env
+Ô£ô Ready in 378ms
+
+ GET /projects 200 in 1046ms (next.js: 510ms, proxy.ts: 161ms, application-code: 374ms)
+[browser] Image with src "/LogoGreen.png" was detected as the Largest Contentful Paint (LCP). Please add the `loading="eager"` property if this image is above the fold.
+Read more: https://nextjs.org/docs/app/api-reference/components/image#loading
+ GET /api/users 200 in 1061ms (next.js: 145ms, application-code: 916ms)
+ GET /api/projects 200 in 2.0s (next.js: 109ms, application-code: 1915ms)
+ GET /api/user/me 200 in 2.3s (next.js: 63ms, application-code: 2.3s)
+ GET /login 200 in 103ms (next.js: 35ms, proxy.ts: 3ms, application-code: 65ms)

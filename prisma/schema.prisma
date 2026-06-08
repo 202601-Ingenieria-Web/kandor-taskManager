@@ -30,10 +30,20 @@ enum Enum_TaskPriority {
 }
 
 enum Enum_ProjectMemberRole {
-  OWNER
-  ADMIN
+  LEADER
   MEMBER
-  VIEWER
+}
+
+enum Enum_MembershipStatus {
+  ACTIVE
+  PENDING
+}
+
+enum Enum_ProjectStatus {
+  DRAFT
+  ACTIVE
+  REJECTED
+  ARCHIVED
 }
 
 model User {
@@ -49,19 +59,24 @@ model User {
   updatedAt DateTime @updatedAt
 
   projectMemberships ProjectMember[]
+  proposedProjects   Project[]
   assignedTasks      TaskAssignment[]
   comments           Comment[]
   timeEntries        TimeEntry[]
 }
 
 model Project {
-  id          String   @id @default(cuid())
+  id          String            @id @default(cuid())
   name        String
   description String?
   color       String?
-  deleted     Boolean  @default(false)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  status      Enum_ProjectStatus @default(DRAFT)
+  deleted     Boolean           @default(false)
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+
+  proposedById String?
+  proposedBy   User?   @relation(fields: [proposedById], references: [id])
 
   members ProjectMember[]
   tasks   Task[]
@@ -70,6 +85,7 @@ model Project {
 model ProjectMember {
   id        String                 @id @default(cuid())
   role      Enum_ProjectMemberRole @default(MEMBER)
+  status    Enum_MembershipStatus  @default(ACTIVE)
   joinedAt  DateTime               @default(now())
   userId    String
   projectId String

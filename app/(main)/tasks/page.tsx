@@ -3,5 +3,5 @@ import { TasksClient } from './tasks-client'
 
 export default async function TasksPage() {
   const session = await verifySession()
-  return <TasksClient role={session.role} />
+  return <TasksClient role={session.role} userId={session.userId} />
 }

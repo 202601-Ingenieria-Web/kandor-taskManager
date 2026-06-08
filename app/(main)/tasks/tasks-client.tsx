@@ -20,7 +20,7 @@ import { toast } from 'sonner'
 
 type User = { id: string; name: string; email: string }
 type Assignment = { id: string; user: User }
-type Project = { id: string; name: string; color: string | null }
+type Project = { id: string; name: string; color: string | null; isMember?: boolean; membershipRole?: string | null }
 type Task = {
   id: string
   title: string
@@ -37,7 +37,7 @@ type Task = {
 const statuses = ['BACKLOG', 'TODO', 'IN_PROGRESS', 'REVIEW', 'DONE']
 const priorities = ['LOW', 'MEDIUM', 'HIGH', 'CRITICAL']
 
-export function TasksClient({ role }: { role: string }) {
+export function TasksClient({ role, userId }: { role: string; userId: string }) {
   const [tasks, setTasks] = useState<Task[]>([])
   const [users, setUsers] = useState<User[]>([])
   const [projects, setProjects] = useState<Project[]>([])
@@ -58,6 +58,18 @@ export function TasksClient({ role }: { role: string }) {
   const [assigneeIds, setAssigneeIds] = useState<string[]>([])
 
   const canManage = role === 'ADMIN' || role === 'TEAM_LEADER'
+
+  const manageableProjects = projects.filter((p) =>
+    role === 'ADMIN' ? true : p.membershipRole === 'LEADER'
+  )
+  const manageableProjectIds = new Set(manageableProjects.map((p) => p.id))
+  const memberProjects = projects.filter((p) => p.isMember)
+
+  function canManageTask(task: Task) {
+    if (role === 'ADMIN') return true
+    if (role === 'TEAM_LEADER') return !task.project || manageableProjectIds.has(task.project.id)
+    return false
+  }
 
   const fetchAll = () => {
     setLoadingInitial(true)
@@ -190,12 +202,12 @@ export function TasksClient({ role }: { role: string }) {
               <TableRow key={t.id}>
                 <TableCell className="font-medium">{t.title}</TableCell>
                 <TableCell>
-                  {canManage ? (
+                  {canManageTask(t) ? (
                     <Select value={t.project?.id || '__none__'} onValueChange={(v) => handleFieldChange(t.id, { projectId: v === '__none__' ? null : v })} disabled={updatingField}>
                       <SelectTrigger className="w-40"><SelectValue /></SelectTrigger>
                       <SelectContent>
                         <SelectItem value="__none__">Sin proyecto</SelectItem>
-                        {projects.map((p) => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}
+                        {manageableProjects.map((p) => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}
                       </SelectContent>
                     </Select>
                   ) : t.project ? (
@@ -222,9 +234,11 @@ export function TasksClient({ role }: { role: string }) {
                 <TableCell>{t.dueDate ? new Date(t.dueDate).toLocaleDateString() : '—'}</TableCell>
                 <TableCell className="space-x-2">
                   <Button variant="outline" size="sm" onClick={() => openEdit(t)}>Editar</Button>
-                  <Button variant="destructive" size="sm" onClick={() => handleDelete(t.id)} disabled={deletingId === t.id}>
-                    {deletingId === t.id ? <Spinner /> : 'Eliminar'}
-                  </Button>
+                  {canManage && (
+                    <Button variant="destructive" size="sm" onClick={() => handleDelete(t.id)} disabled={deletingId === t.id}>
+                      {deletingId === t.id ? <Spinner /> : 'Eliminar'}
+                    </Button>
+                  )}
                 </TableCell>
               </TableRow>
             ))}
@@ -254,7 +268,7 @@ export function TasksClient({ role }: { role: string }) {
                   <SelectTrigger><SelectValue placeholder="Sin proyecto" /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="__none__">Sin proyecto</SelectItem>
-                    {projects.map((p) => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}
+                    {manageableProjects.map((p) => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}
                   </SelectContent>
                 </Select>
               </Field>
