@@ -2,6 +2,10 @@
 
 Sistema de gestión de tareas tipo Kanban con roles, dashboard analítico y notificaciones en tiempo real.
 
+## Integrantes
+
+**Sebastian Rentería Palacios**
+
 ## Demo
 
 | Rol          | Correo             | Contraseña |
@@ -14,7 +18,7 @@ Sistema de gestión de tareas tipo Kanban con roles, dashboard analítico y noti
 
 ## Despliegue
 
-🔗 **`https://nombreEquipo-Funcionalidad.vercel.app`** (pendiente de crear)
+🔗 **`https://kandor-taskmanager-2.onrender.com`** 
 
 ## Funcionalidades
 
