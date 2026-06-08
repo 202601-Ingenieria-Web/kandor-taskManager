@@ -20,11 +20,13 @@ import { toast } from 'sonner'
 type User = { id: string; name: string; email: string }
 type Member = { id: string; role: string; status: string; user: User }
 type TaskAssignment = { id: string; user: { id: string; name: string } }
+type TaskItem = { id: string; name: string; direction: string; checked: boolean; taskId: string }
 type Task = {
   id: string; title: string; description: string | null
   status: string; priority: string; dueDate: string | null
   estimatedHours: number | null
   assignments: TaskAssignment[]
+  items: TaskItem[]
 }
 type Project = {
   id: string; name: string; description: string | null; color: string | null
@@ -74,6 +76,8 @@ export function ProjectsClient({ role, userId }: { role: string; userId: string 
   const [editTaskHours, setEditTaskHours] = useState('')
   const [editTaskAssign, setEditTaskAssign] = useState('')
   const [savingTask, setSavingTask] = useState(false)
+  const [newItemName, setNewItemName] = useState('')
+  const [newItemDir, setNewItemDir] = useState<'INPUT' | 'OUTPUT'>('INPUT')
 
   const [proposals, setProposals] = useState<Project[]>([])
   const [proposalsOpen, setProposalsOpen] = useState(false)
@@ -95,6 +99,15 @@ export function ProjectsClient({ role, userId }: { role: string; userId: string 
           if (prev) {
             const updated = ps.find((p: Project) => p.id === prev.id)
             return updated || prev
+          }
+          return prev
+        })
+        setEditingTask(prev => {
+          if (prev) {
+            for (const p of ps) {
+              const found = p.tasks?.find((t: Task) => t.id === prev.id)
+              if (found) return found
+            }
           }
           return prev
         })
@@ -354,6 +367,40 @@ export function ProjectsClient({ role, userId }: { role: string; userId: string 
     finally { setSavingTask(false) }
   }
 
+  async function handleAddItem() {
+    if (!newItemName || !editingTask) return
+    try {
+      const res = await fetch('/api/task-items', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ taskId: editingTask.id, name: newItemName, direction: newItemDir }),
+      })
+      if (!res.ok) throw new Error()
+      setNewItemName('')
+      fetchProjects()
+    } catch { toast.error('Error al agregar') }
+  }
+
+  async function handleToggleItem(item: TaskItem) {
+    try {
+      const res = await fetch('/api/task-items', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: item.id, checked: !item.checked }),
+      })
+      if (!res.ok) throw new Error()
+      fetchProjects()
+    } catch { toast.error('Error al actualizar') }
+  }
+
+  async function handleDeleteItem(id: string) {
+    try {
+      const res = await fetch(`/api/task-items?id=${id}`, { method: 'DELETE' })
+      if (!res.ok) throw new Error()
+      fetchProjects()
+    } catch { toast.error('Error al eliminar') }
+  }
+
   const sortedProjects = [...projects].sort((a, b) => {
     const aMember = a.isMember ? 0 : 1
     const bMember = b.isMember ? 0 : 1
@@ -471,6 +518,11 @@ export function ProjectsClient({ role, userId }: { role: string; userId: string 
                             className={`bg-card border rounded-lg p-3 shadow-sm hover:shadow-md transition-shadow cursor-pointer${isMember ? ' cursor-grab active:cursor-grabbing' : ''}`}
                           >
                             <p className="text-sm font-medium">{task.title}</p>
+                            {task.items && task.items.length > 0 && (
+                              <p className="text-[10px] text-muted-foreground mt-0.5">
+                                {task.items.filter((i) => i.checked).length}/{task.items.length}
+                              </p>
+                            )}
                             <div className="mt-1.5 space-y-0.5 text-xs text-muted-foreground">
                               <p><span className="font-medium">Asignado a:</span> {task.assignments?.length > 0 ? task.assignments.map((a) => a.user.name).join(', ') : 'Aún no asignado'}</p>
                               <p><span className="font-medium">Prioridad:</span> {task.priority}</p>
@@ -599,6 +651,42 @@ export function ProjectsClient({ role, userId }: { role: string; userId: string 
                 </SelectContent>
               </Select>
             </Field>
+
+            {/* insumos */}
+            <div className="border-t pt-4">
+              <h4 className="text-sm font-semibold mb-2">Insumos necesarios</h4>
+              <div className="space-y-1 mb-3">
+                {editingTask?.items?.filter((i) => i.direction === 'INPUT').map((item) => (
+                  <div key={item.id} className="flex items-center gap-2 group">
+                    <input type="checkbox" checked={item.checked} onChange={() => handleToggleItem(item)} className="size-4 accent-green-600" />
+                    <span className={`text-sm flex-1 ${item.checked ? 'line-through text-muted-foreground' : ''}`}>{item.name}</span>
+                    <button onClick={() => handleDeleteItem(item.id)} className="text-xs text-destructive opacity-0 group-hover:opacity-100 transition-opacity">✕</button>
+                  </div>
+                ))}
+              </div>
+              <div className="flex gap-2">
+                <Input placeholder="Nuevo insumo..." value={newItemDir === 'INPUT' ? newItemName : ''} onChange={(e) => { setNewItemDir('INPUT'); setNewItemName(e.target.value) }} className="h-8 text-sm" />
+                <Button size="sm" onClick={() => { setNewItemDir('INPUT'); handleAddItem() }} disabled={!newItemName || newItemDir !== 'INPUT'}>Agregar</Button>
+              </div>
+            </div>
+
+            {/* entregables */}
+            <div className="border-t pt-4">
+              <h4 className="text-sm font-semibold mb-2">Entregables obtenidos</h4>
+              <div className="space-y-1 mb-3">
+                {editingTask?.items?.filter((i) => i.direction === 'OUTPUT').map((item) => (
+                  <div key={item.id} className="flex items-center gap-2 group">
+                    <input type="checkbox" checked={item.checked} onChange={() => handleToggleItem(item)} className="size-4 accent-blue-600" />
+                    <span className={`text-sm flex-1 ${item.checked ? 'line-through text-muted-foreground' : ''}`}>{item.name}</span>
+                    <button onClick={() => handleDeleteItem(item.id)} className="text-xs text-destructive opacity-0 group-hover:opacity-100 transition-opacity">✕</button>
+                  </div>
+                ))}
+              </div>
+              <div className="flex gap-2">
+                <Input placeholder="Nuevo entregable..." value={newItemDir === 'OUTPUT' ? newItemName : ''} onChange={(e) => { setNewItemDir('OUTPUT'); setNewItemName(e.target.value) }} className="h-8 text-sm" />
+                <Button size="sm" onClick={() => { setNewItemDir('OUTPUT'); handleAddItem() }} disabled={!newItemName || newItemDir !== 'OUTPUT'}>Agregar</Button>
+              </div>
+            </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => { setEditTaskOpen(false); setEditingTask(null) }}>Cancelar</Button>

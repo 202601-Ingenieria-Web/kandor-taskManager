@@ -120,6 +120,7 @@ model Task {
   comments     Comment[]
   timeEntries  TimeEntry[]
   resources    TaskResource[]
+  items        TaskItem[]
   dependencies TaskDependency[] @relation("DependsOn")
   dependents   TaskDependency[] @relation("DependentTasks")
 }
@@ -184,6 +185,22 @@ model TaskResource {
   resource   Resource @relation(fields: [resourceId], references: [id])
 
   @@unique([taskId, resourceId])
+}
+
+enum Enum_ItemDirection {
+  INPUT
+  OUTPUT
+}
+
+model TaskItem {
+  id        String              @id @default(cuid())
+  name      String
+  direction Enum_ItemDirection  @default(INPUT)
+  checked   Boolean             @default(false)
+  createdAt DateTime            @default(now())
+
+  taskId String
+  task   Task @relation(fields: [taskId], references: [id])
 }
 
 model TimeEntry {

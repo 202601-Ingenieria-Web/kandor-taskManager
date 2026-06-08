@@ -6,6 +6,7 @@ import prisma from '@/lib/prisma';
 const taskInclude = {
   assignments: { include: { user: { select: { id: true, name: true, email: true } } } },
   project: { select: { id: true, name: true, color: true } },
+  items: { orderBy: { createdAt: 'asc' as const } },
 };
 
 export async function GET() {

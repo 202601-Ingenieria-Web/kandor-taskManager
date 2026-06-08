@@ -12,6 +12,7 @@ const projectInclude = {
     where: { deleted: false },
     include: {
       assignments: { include: { user: { select: { id: true, name: true } } } },
+      items: { orderBy: { createdAt: 'asc' as const } },
     },
     orderBy: { createdAt: 'asc' as const },
   },
