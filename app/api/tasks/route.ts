@@ -28,6 +28,15 @@ export async function POST(request: NextRequest) {
 
   if (!title) return NextResponse.json({ error: 'Title is required' }, { status: 400 });
 
+  if (projectId && session.role !== 'ADMIN' && session.role !== 'TEAM_LEADER') {
+    const membership = await prisma.projectMember.findUnique({
+      where: { userId_projectId: { userId: session.userId, projectId } },
+    });
+    if (!membership || membership.status !== 'ACTIVE') {
+      return NextResponse.json({ error: 'You are not a member of this project' }, { status: 403 });
+    }
+  }
+
   const task = await prisma.task.create({
     data: {
       title,
@@ -128,6 +137,17 @@ export async function DELETE(request: NextRequest) {
   if (!id) return NextResponse.json({ error: 'Task ID is required' }, { status: 400 });
 
   const existing = await prisma.task.findUnique({ where: { id } });
+
+  if (session.role !== 'ADMIN') {
+    const membership = existing?.projectId
+      ? await prisma.projectMember.findUnique({
+          where: { userId_projectId: { userId: session.userId, projectId: existing.projectId } },
+        })
+      : null;
+    const isLeader = membership?.role === 'LEADER' && membership?.status === 'ACTIVE';
+    if (!isLeader) return NextResponse.json({ error: 'Only ADMIN and TEAM_LEADER can delete tasks' }, { status: 403 });
+  }
+
   await prisma.task.update({ where: { id }, data: { deleted: true } });
   await recordAuditLog({
     action: 'DELETED', entity: 'Tarea', entityId: id,

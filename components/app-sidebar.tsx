@@ -18,20 +18,19 @@ import {
   TaskEdit01Icon,
   Folder01Icon,
   UserGroupIcon,
-  Settings05Icon,
   TimeHalfPassIcon,
 } from '@hugeicons/core-free-icons'
 
-const navItems = [
+const allNavItems = [
   { title: 'Dashboard', url: '/dashboard', icon: <HugeiconsIcon icon={DashboardSquare01Icon} strokeWidth={2} /> },
   { title: 'Proyectos', url: '/projects', icon: <HugeiconsIcon icon={Folder01Icon} strokeWidth={2} /> },
   { title: 'Tareas', url: '/tasks', icon: <HugeiconsIcon icon={TaskEdit01Icon} strokeWidth={2} /> },
-  { title: 'Usuarios', url: '/users', icon: <HugeiconsIcon icon={UserGroupIcon} strokeWidth={2} /> },
+  { title: 'Usuarios', url: '/users', icon: <HugeiconsIcon icon={UserGroupIcon} strokeWidth={2} />, adminOnly: true },
   { title: 'Historial', url: '/account/history', icon: <HugeiconsIcon icon={TimeHalfPassIcon} strokeWidth={2} /> },
-  { title: 'Configuración', url: '/settings', icon: <HugeiconsIcon icon={Settings05Icon} strokeWidth={2} /> },
 ]
 
-export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
+export function AppSidebar({ role, ...props }: { role?: string } & React.ComponentProps<typeof Sidebar>) {
+  const navItems = allNavItems.filter((item) => !item.adminOnly || role === 'ADMIN')
   return (
     <Sidebar collapsible='offcanvas' {...props}>
       <SidebarHeader>
