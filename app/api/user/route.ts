@@ -1,25 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 
-export async function POST(request: NextRequest): Promise<NextResponse> {
-  const { user } = await request.json();
-
-  try {
-    const createdUser = await prisma.user.create({
-      data: {
-        name: user.name,
-        image: user.image,
-        email: user.email,
-        role: user.role,
-      },
-    });
-    return NextResponse.json({ user: createdUser }, { status: 201 });
-  } catch (error) {
-    console.error('Error creating user:', error);
-    return NextResponse.json({ error: 'Failed to create user' }, { status: 500 });
-  }
-}
-
 export async function GET(request: NextRequest): Promise<NextResponse> {
   const { searchParams } = new URL(request.url);
   const userId = searchParams.get('id');

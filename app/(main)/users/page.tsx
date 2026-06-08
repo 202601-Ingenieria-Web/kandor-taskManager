@@ -1,30 +1,28 @@
-import { columns, User } from './columns';
-import { DataTable } from './data-table';
-import { Button } from '@/components/ui/button';
-import Link from 'next/link';
+import { verifySession } from '@/lib/dal'
+import { redirect } from 'next/navigation'
+import prisma from '@/lib/prisma'
+import { UsersTable } from './users-table'
+import { CreateUserDialog } from './create-user-dialog'
 
-async function getData(): Promise<User[]> {
-  const response = await fetch('http://localhost:3000/api/users');
-  const data = await response.json();
+export default async function UsersPage() {
+  const session = await verifySession()
 
-  return data.users;
-}
+  if (session.role !== 'ADMIN') {
+    redirect('/dashboard')
+  }
 
-export default async function DemoPage() {
-  const data = await getData();
+  const users = await prisma.user.findMany({
+    select: { id: true, name: true, email: true, role: true, createdAt: true, enabled: true },
+    orderBy: { createdAt: 'desc' },
+  })
 
   return (
-    <div className='container mx-auto py-10'>
-      <div className='flex flex-row justify-around my-10 '>
-        <div>
-          <h2 className='text-2xl font-bold tracking-tight'>Users</h2>
-          <p className='text-muted-foreground'>Manage your users here.</p>
-        </div>
-        <Link href='/users/create'>
-          <Button className='ml-auto'>Create User</Button>
-        </Link>
+    <div className="p-6 space-y-6">
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-bold">Gestión de Usuarios</h1>
+        <CreateUserDialog />
       </div>
-      <DataTable columns={columns} data={data} />
+      <UsersTable users={users} />
     </div>
-  );
+  )
 }

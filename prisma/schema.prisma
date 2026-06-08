@@ -1,8 +1,3 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Get a free hosted Postgres database in seconds: `npx create-db`
-
 generator client {
   provider = "prisma-client"
   output   = "../app/generated/prisma"
@@ -12,133 +7,179 @@ datasource db {
   provider = "postgresql"
 }
 
-enum Enum_Role {
+enum Enum_UserRole {
   ADMIN
-  USER
+  TEAM_LEADER
+  MEMBER
 }
 
-enum Enum_OrderStatus {
-  PENDING
-  PAID
-  SHIPPED
-  DELIVERED
-  CANCELED
+enum Enum_TaskStatus {
+  BACKLOG
+  TODO
+  IN_PROGRESS
+  REVIEW
+  DONE
+  CANCELLED
 }
 
-enum Enum_PaymentMethod {
-  CREDIT_CARD
-  DEBIT_CARD
-  PAYPAL
-  CASH
+enum Enum_TaskPriority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
 }
-enum Enum_PaymentStatus {
-  PENDING
-  COMPLETED
-  FAILED
-  REFUNDED
+
+enum Enum_ProjectMemberRole {
+  OWNER
+  ADMIN
+  MEMBER
+  VIEWER
 }
 
 model User {
-  id    String @id @default(cuid())
-  name  String
-  email String @unique
-  image String?
-  deleted Boolean @default(false)
-  enabled Boolean @default(true)
+  id        String   @id @default(cuid())
+  name      String
+  email     String   @unique
+  password  String
+  image     String?
+  role      Enum_UserRole @default(MEMBER)
+  deleted   Boolean  @default(false)
+  enabled   Boolean  @default(true)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-  perfil Perfil?
-  role Enum_Role @default(USER)
+
+  projectMemberships ProjectMember[]
+  assignedTasks      TaskAssignment[]
+  comments           Comment[]
+  timeEntries        TimeEntry[]
 }
 
-model Perfil {
-  id String @id @default(cuid())
-  lastName String
-  address String
-  phone String
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  userId String @unique
+model Project {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  color       String?
+  deleted     Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  members ProjectMember[]
+  tasks   Task[]
+}
+
+model ProjectMember {
+  id        String                 @id @default(cuid())
+  role      Enum_ProjectMemberRole @default(MEMBER)
+  joinedAt  DateTime               @default(now())
+  userId    String
+  projectId String
+
+  user    User    @relation(fields: [userId], references: [id])
+  project Project @relation(fields: [projectId], references: [id])
+
+  @@unique([userId, projectId])
+}
+
+model Task {
+  id          String          @id @default(cuid())
+  title       String
+  description String?
+  status      Enum_TaskStatus @default(TODO)
+  priority    Enum_TaskPriority @default(MEDIUM)
+  dueDate     DateTime?
+  estimatedHours Float?
+  deleted     Boolean         @default(false)
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+
+  projectId String?
+  project   Project? @relation(fields: [projectId], references: [id])
+
+  parentTaskId String?
+  parentTask   Task?  @relation("TaskDependencies", fields: [parentTaskId], references: [id])
+  subtasks     Task[] @relation("TaskDependencies")
+
+  assignments  TaskAssignment[]
+  comments     Comment[]
+  timeEntries  TimeEntry[]
+  resources    TaskResource[]
+  dependencies TaskDependency[] @relation("DependsOn")
+  dependents   TaskDependency[] @relation("DependentTasks")
+}
+
+model TaskAssignment {
+  id        String   @id @default(cuid())
+  assignedAt DateTime @default(now())
+  userId    String
+  taskId    String
+
   user User @relation(fields: [userId], references: [id])
+  task Task @relation(fields: [taskId], references: [id])
+
+  @@unique([userId, taskId])
 }
 
-model Customer {
-  id String @id @default(cuid())
-  name String
-  email String @unique
-  phone String
-  address String
-  deleted Boolean @default(false)
-  enabled Boolean @default(true)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  orders Order[]
+model TaskDependency {
+  id            String @id @default(cuid())
+  taskId        String
+  dependsOnId   String
+
+  task       Task @relation("DependsOn", fields: [taskId], references: [id])
+  dependsOn  Task @relation("DependentTasks", fields: [dependsOnId], references: [id])
+
+  @@unique([taskId, dependsOnId])
 }
 
-model Supplier {
-  id String @id @default(cuid())
-  name String
-  email String @unique
-  phone String
-  address String
-  deleted Boolean @default(false)
-  enabled Boolean @default(true)
+model Comment {
+  id        String   @id @default(cuid())
+  content   String
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-  products Product[]
+
+  taskId String
+  task   Task @relation(fields: [taskId], references: [id])
+
+  userId String
+  user   User @relation(fields: [userId], references: [id])
 }
 
-model Product {
-  id String @id @default(cuid())
-  name String
-  description String
-  price Float
-  stock Int
-  deleted Boolean @default(false)
-  enabled Boolean @default(true)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  suppliers Supplier[]
-  orderItems OrderItem[]
+model Resource {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  type        String?
+  deleted     Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  taskResources TaskResource[]
 }
 
-model Order {
-  id String @id @default(cuid())
-  orderDate DateTime @default(now())
-  subTotalAmount Float
-  texAmount Float
-  totalAmount Float
-  status  Enum_OrderStatus @default(PENDING)
-  deleted Boolean @default(false)
-  enabled Boolean @default(true)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  customerId String
-  customer Customer @relation(fields: [customerId], references: [id])
-  orderItems OrderItem[]
-  payment Payment[]
+model TaskResource {
+  id         String   @id @default(cuid())
+  quantity   Float?
+  createdAt  DateTime @default(now())
+
+  taskId     String
+  task       Task @relation(fields: [taskId], references: [id])
+
+  resourceId String
+  resource   Resource @relation(fields: [resourceId], references: [id])
+
+  @@unique([taskId, resourceId])
 }
 
-model OrderItem {
-  id String @id @default(cuid())
-  quantity Int
-  price Float
+model TimeEntry {
+  id        String   @id @default(cuid())
+  hours     Float
+  description String?
+  date      DateTime @default(now())
   createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  productId String
-  product Product @relation(fields: [productId], references: [id])
-  orderId String
-  order Order @relation(fields: [orderId], references: [id])
+
+  taskId String
+  task   Task @relation(fields: [taskId], references: [id])
+
+  userId String
+  user   User @relation(fields: [userId], references: [id])
 }
 
-model Payment {
-  id String @id @default(cuid())
-  paymentDate DateTime @default(now())
-  amount Float
-  method  Enum_PaymentMethod
-  status  Enum_PaymentStatus @default(PENDING)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  orderId String
-  order Order @relation(fields: [orderId], references: [id])
-}
