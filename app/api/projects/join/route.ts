@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { decrypt } from '@/lib/session';
 import prisma from '@/lib/prisma';
+import { recordAuditLog } from '@/lib/audit-log';
 
 export async function POST(request: NextRequest) {
   const cookie = (await cookies()).get('session')?.value;
@@ -20,6 +21,11 @@ export async function POST(request: NextRequest) {
   const membership = await prisma.projectMember.create({
     data: { userId: session.userId, projectId, role: 'MEMBER', status: 'ACTIVE' },
     include: { user: { select: { id: true, name: true } } },
+  });
+
+  await recordAuditLog({
+    action: 'JOINED', entity: 'Proyecto', entityId: projectId,
+    detail: 'Se matriculó en el proyecto', userId: session.userId, projectId,
   });
 
   return NextResponse.json({ membership }, { status: 201 });

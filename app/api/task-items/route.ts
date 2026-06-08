@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { decrypt } from '@/lib/session';
 import prisma from '@/lib/prisma';
+import { recordAuditLog } from '@/lib/audit-log';
 
 export async function GET(request: NextRequest) {
   const cookie = (await cookies()).get('session')?.value;
@@ -30,6 +31,12 @@ export async function POST(request: NextRequest) {
   const item = await prisma.taskItem.create({
     data: { taskId, name, direction: direction || 'INPUT' },
   });
+  const task = await prisma.task.findUnique({ where: { id: taskId }, select: { title: true, projectId: true } });
+  await recordAuditLog({
+    action: 'ADDED', entity: direction === 'OUTPUT' ? 'Entregable' : 'Insumo',
+    entityId: item.id, detail: `"${name}" en tarea "${task?.title || ''}"`,
+    userId: session.userId, projectId: task?.projectId,
+  });
   return NextResponse.json({ item }, { status: 201 });
 }
 
@@ -45,7 +52,17 @@ export async function PUT(request: NextRequest) {
   if (name !== undefined) data.name = name;
   if (checked !== undefined) data.checked = checked;
 
+  const oldItem = await prisma.taskItem.findUnique({ where: { id }, include: { task: { select: { title: true, projectId: true } } } });
   const item = await prisma.taskItem.update({ where: { id }, data });
+  if (checked !== undefined && oldItem) {
+    const task = oldItem.task;
+    await recordAuditLog({
+      action: checked ? 'CHECKED' : 'UPDATED',
+      entity: oldItem.direction === 'OUTPUT' ? 'Entregable' : 'Insumo',
+      entityId: id, detail: `"${oldItem.name}" en tarea "${task?.title || ''}"`,
+      userId: session.userId, projectId: task?.projectId,
+    });
+  }
   return NextResponse.json({ item });
 }
 
@@ -58,6 +75,14 @@ export async function DELETE(request: NextRequest) {
   const id = searchParams.get('id');
   if (!id) return NextResponse.json({ error: 'id required' }, { status: 400 });
 
+  const oldItem = await prisma.taskItem.findUnique({ where: { id }, include: { task: { select: { title: true, projectId: true } } } });
   await prisma.taskItem.delete({ where: { id } });
+  if (oldItem) {
+    await recordAuditLog({
+      action: 'DELETED', entity: oldItem.direction === 'OUTPUT' ? 'Entregable' : 'Insumo',
+      entityId: id, detail: `"${oldItem.name}" de tarea "${oldItem.task.title}"`,
+      userId: session.userId, projectId: oldItem.task.projectId,
+    });
+  }
   return NextResponse.json({ message: 'Deleted' });
 }

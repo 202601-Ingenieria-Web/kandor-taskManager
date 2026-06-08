@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { decrypt } from '@/lib/session';
 import prisma from '@/lib/prisma';
+import { recordAuditLog } from '@/lib/audit-log';
 
 export async function POST(request: NextRequest) {
   const cookie = (await cookies()).get('session')?.value;
@@ -35,6 +36,10 @@ export async function POST(request: NextRequest) {
       data: { userId, projectId, role: 'MEMBER', status: 'ACTIVE' },
       include: { user: { select: { id: true, name: true, email: true } } },
     });
+    await recordAuditLog({
+      action: 'ADDED', entity: 'Miembro', entityId: member.id,
+      detail: `${member.user.name} al proyecto`, userId: session.userId, projectId,
+    });
     return NextResponse.json({ member }, { status: 201 });
   }
 
@@ -42,8 +47,13 @@ export async function POST(request: NextRequest) {
     if (userId === session.userId) {
       return NextResponse.json({ error: 'Cannot remove yourself' }, { status: 400 });
     }
+    const removed = await prisma.user.findUnique({ where: { id: userId }, select: { name: true } });
     await prisma.projectMember.deleteMany({
       where: { userId, projectId },
+    });
+    await recordAuditLog({
+      action: 'REMOVED', entity: 'Miembro',
+      detail: `${removed?.name || ''} del proyecto`, userId: session.userId, projectId,
     });
     return NextResponse.json({ message: 'Member removed' });
   }

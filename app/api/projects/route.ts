@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { decrypt } from '@/lib/session';
 import prisma from '@/lib/prisma';
+import { recordAuditLog } from '@/lib/audit-log';
 
 const projectInclude = {
   members: {
@@ -88,6 +89,11 @@ export async function POST(request: NextRequest) {
     include: projectInclude,
   });
 
+  await recordAuditLog({
+    action: 'CREATED', entity: 'Proyecto', entityId: project.id,
+    detail: name, userId: session.userId, projectId: project.id,
+  });
+
   return NextResponse.json({ project }, { status: 201 });
 }
 
@@ -120,6 +126,11 @@ export async function PUT(request: NextRequest) {
     include: projectInclude,
   });
 
+  await recordAuditLog({
+    action: 'UPDATED', entity: 'Proyecto', entityId: id,
+    detail: project.name, userId: session.userId, projectId: id,
+  });
+
   return NextResponse.json({ project: updated });
 }
 
@@ -135,6 +146,11 @@ export async function DELETE(request: NextRequest) {
 
   if (session.role !== 'ADMIN') return NextResponse.json({ error: 'Only ADMIN can delete projects' }, { status: 403 });
 
+  const proj = await prisma.project.findUnique({ where: { id }, select: { name: true } });
   await prisma.project.update({ where: { id }, data: { deleted: true } });
+  await recordAuditLog({
+    action: 'DELETED', entity: 'Proyecto', entityId: id,
+    detail: proj?.name || '', userId: session.userId,
+  });
   return NextResponse.json({ message: 'Project deleted' });
 }

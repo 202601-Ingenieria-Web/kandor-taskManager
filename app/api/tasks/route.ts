@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { decrypt } from '@/lib/session';
 import prisma from '@/lib/prisma';
+import { recordAuditLog } from '@/lib/audit-log';
 
 const taskInclude = {
   assignments: { include: { user: { select: { id: true, name: true, email: true } } } },
@@ -43,6 +44,12 @@ export async function POST(request: NextRequest) {
     include: taskInclude,
   });
 
+  await recordAuditLog({
+    action: 'CREATED', entity: 'Tarea', entityId: task.id,
+    detail: `${title}`,
+    userId: session.userId, projectId,
+  });
+
   return NextResponse.json({ task }, { status: 201 });
 }
 
@@ -69,11 +76,40 @@ export async function PUT(request: NextRequest) {
 
   await prisma.task.update({ where: { id }, data: updateData });
 
+  const changes: string[] = [];
+  if (status !== undefined && status !== existing.status) changes.push(`movida de ${existing.status} a ${status}`);
+  if (title !== undefined && title !== existing.title) changes.push(`título a "${title}"`);
+  if (priority !== undefined && priority !== existing.priority) changes.push(`prioridad a ${priority}`);
+  if (description !== undefined && description !== (existing.description ?? '')) changes.push('descripción actualizada');
+  if (dueDate !== undefined && (dueDate ? new Date(dueDate).toISOString() : null) !== (existing.dueDate?.toISOString() ?? null)) changes.push('fecha vencimiento actualizada');
+  if (estimatedHours !== undefined && (estimatedHours ? parseFloat(estimatedHours) : null) !== existing.estimatedHours) changes.push('horas estimadas actualizadas');
+
+  if (changes.length > 0) {
+    await recordAuditLog({
+      action: changes[0].startsWith('movida') ? 'MOVED' : 'UPDATED',
+      entity: 'Tarea', entityId: id,
+      detail: `"${existing.title}": ${changes.join(', ')}`,
+      userId: session.userId, projectId: existing.projectId,
+    });
+  }
+
   if (assigneeIds !== undefined) {
+    const oldAssignments = await prisma.taskAssignment.findMany({ where: { taskId: id }, select: { userId: true } });
+    const oldIds = oldAssignments.map((a) => a.userId).sort();
+    const newIds = [...(assigneeIds as string[])].sort();
+    const changed = oldIds.length !== newIds.length || oldIds.some((id, i) => id !== newIds[i]);
+
     await prisma.taskAssignment.deleteMany({ where: { taskId: id } });
     if (assigneeIds.length > 0) {
       await prisma.taskAssignment.createMany({
         data: assigneeIds.map((userId: string) => ({ taskId: id, userId })),
+      });
+    }
+    if (changed) {
+      await recordAuditLog({
+        action: 'UPDATED', entity: 'Tarea', entityId: id,
+        detail: `"${existing.title}": asignación actualizada`,
+        userId: session.userId, projectId: existing.projectId,
       });
     }
   }
@@ -91,6 +127,12 @@ export async function DELETE(request: NextRequest) {
   const id = searchParams.get('id');
   if (!id) return NextResponse.json({ error: 'Task ID is required' }, { status: 400 });
 
+  const existing = await prisma.task.findUnique({ where: { id } });
   await prisma.task.update({ where: { id }, data: { deleted: true } });
+  await recordAuditLog({
+    action: 'DELETED', entity: 'Tarea', entityId: id,
+    detail: existing?.title || '',
+    userId: session.userId, projectId: existing?.projectId,
+  });
   return NextResponse.json({ message: 'Task deleted' });
 }

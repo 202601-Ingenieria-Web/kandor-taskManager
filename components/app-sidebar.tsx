@@ -19,6 +19,7 @@ import {
   Folder01Icon,
   UserGroupIcon,
   Settings05Icon,
+  TimeHalfPassIcon,
 } from '@hugeicons/core-free-icons'
 
 const navItems = [
@@ -26,6 +27,7 @@ const navItems = [
   { title: 'Proyectos', url: '/projects', icon: <HugeiconsIcon icon={Folder01Icon} strokeWidth={2} /> },
   { title: 'Tareas', url: '/tasks', icon: <HugeiconsIcon icon={TaskEdit01Icon} strokeWidth={2} /> },
   { title: 'Usuarios', url: '/users', icon: <HugeiconsIcon icon={UserGroupIcon} strokeWidth={2} /> },
+  { title: 'Historial', url: '/account/history', icon: <HugeiconsIcon icon={TimeHalfPassIcon} strokeWidth={2} /> },
   { title: 'Configuración', url: '/settings', icon: <HugeiconsIcon icon={Settings05Icon} strokeWidth={2} /> },
 ]
 

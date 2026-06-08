@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { decrypt } from '@/lib/session';
 import prisma from '@/lib/prisma';
+import { recordAuditLog } from '@/lib/audit-log';
 
 export async function PUT(request: NextRequest) {
   const cookie = (await cookies()).get('session')?.value;
@@ -21,17 +22,26 @@ export async function PUT(request: NextRequest) {
   if (!isLeader && !isAdmin) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
 
   if (approve) {
+    const leaving = await prisma.user.findUnique({ where: { id: targetUserId }, select: { name: true } });
     await prisma.projectMember.deleteMany({
       where: { userId: targetUserId, projectId },
     });
     await prisma.taskAssignment.deleteMany({
       where: { userId: targetUserId, task: { projectId } },
     });
+    await recordAuditLog({
+      action: 'LEFT', entity: 'Proyecto',
+      detail: `${leaving?.name || ''} salió del proyecto`, userId: session.userId, projectId,
+    });
     return NextResponse.json({ message: 'Leave approved, member removed and tasks unassigned' });
   } else {
     await prisma.projectMember.update({
       where: { userId_projectId: { userId: targetUserId, projectId } },
       data: { status: 'ACTIVE' },
+    });
+    await recordAuditLog({
+      action: 'REJECTED', entity: 'Salida',
+      detail: 'Solicitud de salida rechazada', userId: session.userId, projectId,
     });
     return NextResponse.json({ message: 'Leave request rejected' });
   }
@@ -52,12 +62,21 @@ export async function POST(request: NextRequest) {
 
   if (membership.role === 'LEADER') {
     await prisma.projectMember.deleteMany({ where: { userId: session.userId, projectId } });
+    await recordAuditLog({
+      action: 'LEFT', entity: 'Proyecto', detail: 'Líder abandonó el proyecto',
+      userId: session.userId, projectId,
+    });
     return NextResponse.json({ message: 'Left project' });
   }
 
   await prisma.projectMember.update({
     where: { userId_projectId: { userId: session.userId, projectId } },
     data: { status: 'LEAVE_REQUESTED' },
+  });
+
+  await recordAuditLog({
+    action: 'REQUESTED', entity: 'Salida', detail: 'Solicitó salir del proyecto',
+    userId: session.userId, projectId,
   });
 
   return NextResponse.json({ message: 'Leave request sent to leader' });

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { decrypt } from '@/lib/session';
 import prisma from '@/lib/prisma';
+import { recordAuditLog } from '@/lib/audit-log';
 
 export async function POST(request: NextRequest) {
   const cookie = (await cookies()).get('session')?.value;
@@ -25,6 +26,11 @@ export async function POST(request: NextRequest) {
     include: { user: { select: { id: true, name: true } } },
   });
 
+  await recordAuditLog({
+    action: 'REQUESTED', entity: 'Liderazgo',
+    detail: 'Solicitó ser líder del proyecto', userId: session.userId, projectId,
+  });
+
   return NextResponse.json({ membership }, { status: 201 });
 }
 
@@ -45,10 +51,19 @@ export async function PUT(request: NextRequest) {
       where: { userId_projectId: { userId, projectId } },
       data: { status: 'ACTIVE' },
     });
+    await recordAuditLog({
+      action: 'APPROVED', entity: 'Liderazgo',
+      detail: 'Líder aprobado', userId: session.userId, projectId,
+    });
     return NextResponse.json({ message: 'Leader approved' });
   } else {
+    const rejected = await prisma.user.findUnique({ where: { id: userId }, select: { name: true } });
     await prisma.projectMember.deleteMany({
       where: { userId, projectId, role: 'LEADER', status: 'PENDING' },
+    });
+    await recordAuditLog({
+      action: 'REJECTED', entity: 'Liderazgo',
+      detail: `${rejected?.name || ''} rechazado como líder`, userId: session.userId, projectId,
     });
     return NextResponse.json({ message: 'Leader request rejected' });
   }
