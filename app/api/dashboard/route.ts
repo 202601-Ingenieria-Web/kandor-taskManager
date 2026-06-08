@@ -9,11 +9,8 @@ export async function GET() {
   if (!session?.userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   const role = session.role as string;
-
-  // -- Base task filter (exclude deleted) --
   const baseWhere = { deleted: false } as any;
 
-  // -- Role-based task filtering --
   let taskWhere: any = { ...baseWhere };
   let title = 'Todas las Tareas';
 
@@ -37,7 +34,6 @@ export async function GET() {
     };
   }
 
-  // -- Fetch tasks --
   const tasks = await prisma.task.findMany({
     where: taskWhere,
     include: {
@@ -47,7 +43,6 @@ export async function GET() {
     orderBy: { createdAt: 'desc' },
   });
 
-  // -- Current counts by status --
   const statusCounts = await prisma.task.groupBy({
     by: ['status'],
     where: taskWhere,
@@ -55,19 +50,26 @@ export async function GET() {
   });
   const totalTasks = statusCounts.reduce((sum, t) => sum + t._count, 0);
 
-  // -- User info --
   const user = await prisma.user.findUnique({
     where: { id: session.userId },
     select: { id: true, name: true, email: true, role: true },
   });
 
-  // -- Daily metrics from audit logs (last 30 days, filtered by visible tasks) --
+  // ---- Chart data: last 30 days ----
   const visibleTaskIds = tasks.map((t) => t.id);
 
   const startDate = new Date();
   startDate.setDate(startDate.getDate() - 29);
   startDate.setHours(0, 0, 0, 0);
 
+  // Tasks created by date
+  const createdBeforeDate: Record<string, number> = {};
+  for (const t of tasks) {
+    const key = t.createdAt.toISOString().slice(0, 10);
+    createdBeforeDate[key] = (createdBeforeDate[key] || 0) + 1;
+  }
+
+  // Completion events from audit logs
   const auditLogs = await prisma.auditLog.findMany({
     where: {
       createdAt: { gte: startDate },
@@ -86,14 +88,40 @@ export async function GET() {
     }
   }
 
-  const dailyMetrics: { date: string; completed: number }[] = [];
+  // Count tasks created BEFORE the start date (baseline)
+  let baselineCreated = 0;
+  for (const t of tasks) {
+    if (t.createdAt < startDate) baselineCreated++;
+  }
+
+  // Build daily metrics with cumulative created, completed, and remaining
+  let cumCreated = baselineCreated;
+  let cumCompleted = 0;
+  const dailyMetrics: {
+    date: string;
+    completed: number;
+    created: number;
+    remaining: number;
+    burnup: number;
+  }[] = [];
+
   for (let i = 0; i < 30; i++) {
     const d = new Date(startDate);
     d.setDate(d.getDate() + i);
     const dateKey = d.toISOString().slice(0, 10);
+
+    const createdThatDay = createdBeforeDate[dateKey] || 0;
+    const completedThatDay = completionsByDate[dateKey] || 0;
+
+    cumCreated += createdThatDay;
+    cumCompleted += completedThatDay;
+
     dailyMetrics.push({
       date: dateKey,
-      completed: completionsByDate[dateKey] || 0,
+      completed: completedThatDay,
+      created: createdThatDay,
+      remaining: Math.max(0, cumCreated - cumCompleted),
+      burnup: cumCompleted,
     });
   }
 

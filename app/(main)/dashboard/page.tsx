@@ -45,23 +45,21 @@ export default function DashboardPage() {
 
   const { user, totalTasks, statusCounts, tasks, dailyMetrics, title } = data
 
-  // Build status count map for charts
   const countMap: Record<string, number> = {}
   statusCounts.forEach((s: any) => { countMap[s.status] = s._count })
   allStatuses.forEach((s) => { if (!countMap[s]) countMap[s] = 0 })
 
   const cfdData = [{ name: 'Estado Actual', ...countMap }]
 
-  const cumulativeCompletions: { date: string; completadas: number; acumulado: number }[] = []
-  let cumSum = 0
-  dailyMetrics.forEach((d: any) => {
-    cumSum += d.completed
-    cumulativeCompletions.push({ date: d.date.slice(5), completadas: d.completed, acumulado: cumSum })
-  })
+  // Build chart data from dailyMetrics
+  const burnupData = dailyMetrics.map((d: any) => ({
+    date: d.date.slice(5),
+    completadas: Number(d.burnup) || 0,
+    total: Number(d.remaining || 0) + Number(d.burnup || 0),
+  }))
 
   return (
     <div className="p-6 lg:p-8 space-y-8">
-      {/* Header */}
       <div>
         <h1 className="text-3xl font-bold text-gray-900">
           Bienvenido, <span className="text-teal-600">{user?.name}</span>
@@ -69,7 +67,6 @@ export default function DashboardPage() {
         <p className="text-gray-500 mt-1">{title}</p>
       </div>
 
-      {/* Status Cards */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
           <div className="flex items-center justify-between">
@@ -98,7 +95,6 @@ export default function DashboardPage() {
         ))}
       </div>
 
-      {/* My Tasks (MEMBER) / Team Tasks (TEAM_LEADER) */}
       {tasks.length > 0 && (
         <div>
           <h2 className="text-xl font-semibold text-gray-900 mb-3">{title}</h2>
@@ -132,40 +128,37 @@ export default function DashboardPage() {
         </div>
       )}
 
-      {/* Charts */}
-      <div className="grid gap-6 lg:grid-cols-2">
-        {/* CFD - Current status snapshot */}
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">Tareas por Estado (CFD)</h3>
-          <ResponsiveContainer width="100%" height={280}>
-            <BarChart data={cfdData}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-              <XAxis dataKey="name" tick={{ fontSize: 12 }} />
-              <YAxis allowDecimals={false} tick={{ fontSize: 12 }} />
-              <Tooltip />
-              <Legend />
-              {allStatuses.map((s) => (
-                <Bar key={s} dataKey={s} name={statusLabels[s]} fill={chartColors[s]} stackId="a" />
-              ))}
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
+      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+        <h3 className="text-lg font-semibold text-gray-900 mb-1">Burnup</h3>
+        <p className="text-sm text-gray-500 mb-4">Tareas completadas vs total</p>
+        <ResponsiveContainer width="100%" height={300}>
+          <LineChart data={burnupData}>
+            <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+            <XAxis dataKey="date" tick={{ fontSize: 10 }} interval="preserveStartEnd" />
+            <YAxis allowDecimals={false} tick={{ fontSize: 12 }} />
+            <Tooltip />
+            <Legend />
+            <Line type="monotone" dataKey="total" name="Total" stroke="#94a3b8" strokeWidth={2} dot={false} strokeDasharray="5 5" />
+            <Line type="monotone" dataKey="completadas" name="Completadas" stroke="#22c55e" strokeWidth={2} dot={{ r: 3 }} activeDot={{ r: 5 }} />
+          </LineChart>
+        </ResponsiveContainer>
+      </div>
 
-        {/* Burndown - Completed per day */}
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">Tareas Completadas / Día (Burndown)</h3>
-          <ResponsiveContainer width="100%" height={280}>
-            <LineChart data={cumulativeCompletions}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-              <XAxis dataKey="date" tick={{ fontSize: 10 }} interval="preserveStartEnd" />
-              <YAxis allowDecimals={false} tick={{ fontSize: 12 }} />
-              <Tooltip />
-              <Legend />
-              <Line type="monotone" dataKey="completadas" name="Completadas" stroke="#14b8a6" strokeWidth={2} dot={{ r: 3 }} activeDot={{ r: 5 }} />
-              <Line type="monotone" dataKey="acumulado" name="Acumulado" stroke="#0f172a" strokeWidth={2} dot={{ r: 3 }} activeDot={{ r: 5 }} />
-            </LineChart>
-          </ResponsiveContainer>
-        </div>
+      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+        <h3 className="text-lg font-semibold text-gray-900 mb-1">CFD</h3>
+        <p className="text-sm text-gray-500 mb-4">Distribución actual de tareas por estado</p>
+        <ResponsiveContainer width="100%" height={280}>
+          <BarChart data={cfdData}>
+            <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+            <XAxis dataKey="name" tick={{ fontSize: 12 }} />
+            <YAxis allowDecimals={false} tick={{ fontSize: 12 }} />
+            <Tooltip />
+            <Legend />
+            {allStatuses.map((s) => (
+              <Bar key={s} dataKey={s} name={statusLabels[s]} fill={chartColors[s]} stackId="a" />
+            ))}
+          </BarChart>
+        </ResponsiveContainer>
       </div>
     </div>
   )
