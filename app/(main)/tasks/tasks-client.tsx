@@ -15,6 +15,7 @@ import {
 } from '@/components/ui/dialog'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Field, FieldLabel } from '@/components/ui/field'
+import { Spinner } from '@/components/ui/spinner'
 import { toast } from 'sonner'
 
 type User = { id: string; name: string; email: string }
@@ -40,9 +41,12 @@ export function TasksClient({ role }: { role: string }) {
   const [tasks, setTasks] = useState<Task[]>([])
   const [users, setUsers] = useState<User[]>([])
   const [projects, setProjects] = useState<Project[]>([])
+  const [loadingInitial, setLoadingInitial] = useState(true)
+  const [deletingId, setDeletingId] = useState<string | null>(null)
+  const [updatingField, setUpdatingField] = useState(false)
   const [open, setOpen] = useState(false)
   const [editing, setEditing] = useState<Task | null>(null)
-  const [loading, setLoading] = useState(false)
+  const [saving, setSaving] = useState(false)
 
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
@@ -55,18 +59,23 @@ export function TasksClient({ role }: { role: string }) {
 
   const canManage = role === 'ADMIN' || role === 'TEAM_LEADER'
 
-  const fetchTasks = () => {
-    fetch('/api/tasks')
-      .then((r) => r.json())
-      .then((d) => setTasks(d.tasks || []))
+  const fetchAll = () => {
+    setLoadingInitial(true)
+    Promise.all([
+      fetch('/api/tasks').then((r) => r.json()),
+      fetch('/api/users').then((r) => r.json()),
+      fetch('/api/projects').then((r) => r.json()),
+    ])
+      .then(([tasksData, usersData, projectsData]) => {
+        setTasks(tasksData.tasks || [])
+        setUsers(usersData.users || [])
+        setProjects(projectsData.projects || [])
+      })
       .catch(() => {})
+      .finally(() => setLoadingInitial(false))
   }
 
-  useEffect(() => {
-    fetchTasks()
-    fetch('/api/users').then((r) => r.json()).then((d) => setUsers(d.users || [])).catch(() => {})
-    fetch('/api/projects').then((r) => r.json()).then((d) => setProjects(d.projects || [])).catch(() => {})
-  }, [])
+  useEffect(() => { fetchAll() }, [])
 
   function resetForm() {
     setTitle(''); setDescription(''); setStatus('TODO'); setPriority('MEDIUM')
@@ -88,7 +97,7 @@ export function TasksClient({ role }: { role: string }) {
 
   async function handleSave() {
     if (!title) return
-    setLoading(true)
+    setSaving(true)
     try {
       const body = { title, description, status, priority, dueDate, estimatedHours, projectId: projectId === '__none__' ? null : projectId, assigneeIds }
       const method = editing ? 'PUT' : 'POST'
@@ -102,27 +111,31 @@ export function TasksClient({ role }: { role: string }) {
       setOpen(false)
       resetForm()
       setEditing(null)
-      fetchTasks()
+      fetchAll()
     } catch {
       toast.error('Error al guardar tarea')
     } finally {
-      setLoading(false)
+      setSaving(false)
     }
   }
 
   async function handleDelete(id: string) {
     if (!confirm('¿Eliminar esta tarea?')) return
+    setDeletingId(id)
     try {
       const res = await fetch(`/api/tasks?id=${id}`, { method: 'DELETE' })
       if (!res.ok) throw new Error()
       toast.success('Tarea eliminada')
-      fetchTasks()
+      fetchAll()
     } catch {
       toast.error('Error al eliminar tarea')
+    } finally {
+      setDeletingId(null)
     }
   }
 
   async function handleFieldChange(id: string, data: Record<string, unknown>) {
+    setUpdatingField(true)
     try {
       const res = await fetch('/api/tasks', {
         method: 'PUT',
@@ -130,9 +143,11 @@ export function TasksClient({ role }: { role: string }) {
         body: JSON.stringify({ id, ...data }),
       })
       if (!res.ok) throw new Error()
-      fetchTasks()
+      fetchAll()
     } catch {
       toast.error('Error al actualizar')
+    } finally {
+      setUpdatingField(false)
     }
   }
 
@@ -140,7 +155,9 @@ export function TasksClient({ role }: { role: string }) {
     <div className="p-6 space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold">Tareas</h1>
-        <Button onClick={() => { resetForm(); setEditing(null); setOpen(true) }}>Crear Tarea</Button>
+        <Button onClick={() => { resetForm(); setEditing(null); setOpen(true) }} disabled={loadingInitial}>
+          Crear Tarea
+        </Button>
       </div>
 
       <div className="border rounded-lg">
@@ -157,12 +174,24 @@ export function TasksClient({ role }: { role: string }) {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {tasks.map((t) => (
+            {loadingInitial ? (
+              <TableRow>
+                <TableCell colSpan={7} className="text-center py-8">
+                  <Spinner className="size-6 mx-auto" />
+                </TableCell>
+              </TableRow>
+            ) : tasks.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
+                  No hay tareas
+                </TableCell>
+              </TableRow>
+            ) : tasks.map((t) => (
               <TableRow key={t.id}>
                 <TableCell className="font-medium">{t.title}</TableCell>
                 <TableCell>
                   {canManage ? (
-                    <Select value={t.project?.id || '__none__'} onValueChange={(v) => handleFieldChange(t.id, { projectId: v === '__none__' ? null : v })}>
+                    <Select value={t.project?.id || '__none__'} onValueChange={(v) => handleFieldChange(t.id, { projectId: v === '__none__' ? null : v })} disabled={updatingField}>
                       <SelectTrigger className="w-40"><SelectValue /></SelectTrigger>
                       <SelectContent>
                         <SelectItem value="__none__">Sin proyecto</SelectItem>
@@ -181,7 +210,7 @@ export function TasksClient({ role }: { role: string }) {
                   )}
                 </TableCell>
                 <TableCell>
-                  <Select value={t.status} onValueChange={(v) => handleFieldChange(t.id, { status: v })}>
+                  <Select value={t.status} onValueChange={(v) => handleFieldChange(t.id, { status: v })} disabled={updatingField}>
                     <SelectTrigger className="w-36"><SelectValue /></SelectTrigger>
                     <SelectContent>
                       {statuses.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
@@ -193,17 +222,12 @@ export function TasksClient({ role }: { role: string }) {
                 <TableCell>{t.dueDate ? new Date(t.dueDate).toLocaleDateString() : '—'}</TableCell>
                 <TableCell className="space-x-2">
                   <Button variant="outline" size="sm" onClick={() => openEdit(t)}>Editar</Button>
-                  <Button variant="destructive" size="sm" onClick={() => handleDelete(t.id)}>Eliminar</Button>
+                  <Button variant="destructive" size="sm" onClick={() => handleDelete(t.id)} disabled={deletingId === t.id}>
+                    {deletingId === t.id ? <Spinner /> : 'Eliminar'}
+                  </Button>
                 </TableCell>
               </TableRow>
             ))}
-            {tasks.length === 0 && (
-              <TableRow>
-                <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
-                  No hay tareas
-                </TableCell>
-              </TableRow>
-            )}
           </TableBody>
         </Table>
       </div>
@@ -299,7 +323,9 @@ export function TasksClient({ role }: { role: string }) {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => { setOpen(false); setEditing(null); resetForm() }}>Cancelar</Button>
-            <Button onClick={handleSave} disabled={loading}>{loading ? 'Guardando...' : 'Guardar'}</Button>
+            <Button onClick={handleSave} disabled={saving}>
+              {saving ? <><Spinner className="mr-1" /> Guardando...</> : 'Guardar'}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
