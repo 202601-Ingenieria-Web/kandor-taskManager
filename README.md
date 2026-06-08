@@ -18,7 +18,7 @@ Sistema de gestión de tareas tipo Kanban con roles, dashboard analítico y noti
 
 ## Despliegue
 
-🔗 **`https://kandor-taskmanager-2.onrender.com`** 
+🔗 [**https://kandor-taskmanager-2.onrender.com**](https://kandor-taskmanager-2.onrender.com)
 
 ## Funcionalidades
 
