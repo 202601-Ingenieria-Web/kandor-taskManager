@@ -34,7 +34,8 @@ export function CreateUserDialog() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name, email, password, role }),
       })
-      if (!res.ok) throw new Error()
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Error al crear usuario')
       toast.success('Usuario creado correctamente')
       router.refresh()
       setOpen(false)
@@ -42,8 +43,8 @@ export function CreateUserDialog() {
       setEmail('')
       setPassword('')
       setRole('MEMBER')
-    } catch {
-      toast.error('Error al crear usuario')
+    } catch (e: any) {
+      toast.error(e.message || 'Error al crear usuario')
     } finally {
       setLoading(false)
     }
