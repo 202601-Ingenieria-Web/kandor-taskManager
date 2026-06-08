@@ -15,13 +15,13 @@ export function LoginForm() {
       <form action={action} className="flex flex-col gap-6">
         <FieldGroup>
           <div className="flex flex-col items-center gap-1 text-center">
-            <h1 className="text-2xl font-bold">Iniciar sesión</h1>
-            <p className="text-sm text-balance text-muted-foreground">
+            <h1 className="text-2xl font-bold text-gray-900">Iniciar sesión</h1>
+            <p className="text-sm text-balance text-gray-500">
               Bienvenido de nuevo 👋
             </p>
           </div>
           <Field>
-            <FieldLabel htmlFor="email">Correo electrónico</FieldLabel>
+            <FieldLabel htmlFor="email" className="text-gray-700">Correo electrónico</FieldLabel>
             <div className="relative">
               <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <rect x="2" y="4" width="20" height="16" rx="2" />
@@ -33,13 +33,13 @@ export function LoginForm() {
                 type="email"
                 placeholder="tu@correo.com"
                 required
-                className="bg-background pl-10"
+                className="bg-gray-50 border-gray-200 pl-10 focus:border-teal-500 focus:ring-teal-500"
               />
             </div>
           </Field>
-          {state?.errors?.email && <p className="text-sm text-destructive">{state.errors.email}</p>}
+          {state?.errors?.email && <p className="text-sm text-red-600">{state.errors.email}</p>}
           <Field>
-            <FieldLabel htmlFor="password">Contraseña</FieldLabel>
+            <FieldLabel htmlFor="password" className="text-gray-700">Contraseña</FieldLabel>
             <div className="relative">
               <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <rect x="3" y="11" width="18" height="11" rx="2" />
@@ -50,25 +50,25 @@ export function LoginForm() {
                 name="password"
                 type="password"
                 required
-                className="bg-background pl-10"
+                className="bg-gray-50 border-gray-200 pl-10 focus:border-teal-500 focus:ring-teal-500"
               />
             </div>
           </Field>
-          {state?.errors?.password && <p className="text-sm text-destructive">{state.errors.password}</p>}
+          {state?.errors?.password && <p className="text-sm text-red-600">{state.errors.password}</p>}
           <div className="flex justify-end">
-            <Link href="#" className="text-sm text-blue-600 hover:underline">
+            <Link href="#" className="text-sm text-teal-600 hover:text-teal-700 hover:underline">
               ¿Olvidaste tu contraseña?
             </Link>
           </div>
-          {state?.message && <p className="text-sm text-destructive">{state.message}</p>}
+          {state?.message && <p className="text-sm text-red-600">{state.message}</p>}
           <Field>
-            <Button type="submit" disabled={pending} className="w-full bg-blue-600 hover:bg-blue-700 text-white">
+            <Button type="submit" disabled={pending} className="w-full bg-[#0f172a] hover:bg-slate-800 text-white">
               {pending ? 'Iniciando sesión...' : 'Iniciar sesión'}
             </Button>
           </Field>
-          <p className="text-sm text-center text-muted-foreground">
+          <p className="text-sm text-center text-gray-500">
             ¿No tienes una cuenta?{' '}
-            <Link href="/signup" className="text-blue-600 hover:underline">
+            <Link href="/signup" className="text-teal-600 hover:text-teal-700 hover:underline">
               Regístrate
             </Link>
           </p>

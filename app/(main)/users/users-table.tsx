@@ -25,7 +25,7 @@ type User = {
 
 const roleColors: Record<string, string> = {
   ADMIN: 'bg-purple-100 text-purple-700',
-  TEAM_LEADER: 'bg-blue-100 text-blue-700',
+  TEAM_LEADER: 'bg-[#0f172a] text-white',
   MEMBER: 'bg-gray-100 text-gray-700',
 }
 
@@ -119,7 +119,7 @@ export function UsersTable({ users: initialUsers }: { users: User[] }) {
           </div>
           <DialogFooter>
             <Button variant="outline" className="border-gray-200 text-gray-700 hover:bg-gray-50" onClick={() => setEditing(null)}>Cancelar</Button>
-            <Button className="bg-blue-600 hover:bg-blue-700 text-white" onClick={handleUpdateRole} disabled={loading}>
+            <Button className="bg-[#0f172a] hover:bg-slate-800 text-white" onClick={handleUpdateRole} disabled={loading}>
               {loading ? 'Guardando...' : 'Guardar'}
             </Button>
           </DialogFooter>
