@@ -518,11 +518,18 @@ export function ProjectsClient({ role, userId }: { role: string; userId: string 
                             className={`bg-card border rounded-lg p-3 shadow-sm hover:shadow-md transition-shadow cursor-pointer${isMember ? ' cursor-grab active:cursor-grabbing' : ''}`}
                           >
                             <p className="text-sm font-medium">{task.title}</p>
-                            {task.items && task.items.length > 0 && (
-                              <p className="text-[10px] text-muted-foreground mt-0.5">
-                                {task.items.filter((i) => i.checked).length}/{task.items.length}
-                              </p>
-                            )}
+                            <div className="flex gap-2 mt-0.5">
+                              {task.items?.filter((i) => i.direction === 'INPUT').length > 0 && (
+                                <span className="text-[10px] text-green-600 dark:text-green-400">
+                                  📦 {task.items.filter((i) => i.direction === 'INPUT' && i.checked).length}/{task.items.filter((i) => i.direction === 'INPUT').length}
+                                </span>
+                              )}
+                              {task.items?.filter((i) => i.direction === 'OUTPUT').length > 0 && (
+                                <span className="text-[10px] text-blue-600 dark:text-blue-400">
+                                  🎯 {task.items.filter((i) => i.direction === 'OUTPUT' && i.checked).length}/{task.items.filter((i) => i.direction === 'OUTPUT').length}
+                                </span>
+                              )}
+                            </div>
                             <div className="mt-1.5 space-y-0.5 text-xs text-muted-foreground">
                               <p><span className="font-medium">Asignado a:</span> {task.assignments?.length > 0 ? task.assignments.map((a) => a.user.name).join(', ') : 'Aún no asignado'}</p>
                               <p><span className="font-medium">Prioridad:</span> {task.priority}</p>
