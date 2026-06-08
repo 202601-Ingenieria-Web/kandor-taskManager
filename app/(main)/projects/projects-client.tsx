@@ -83,6 +83,8 @@ export function ProjectsClient({ role, userId }: { role: string; userId: string 
   const [proposalsOpen, setProposalsOpen] = useState(false)
   const [pendingLeaders, setPendingLeaders] = useState<(Member & { projectId: string; projectName: string })[]>([])
   const [pendingLeadersOpen, setPendingLeadersOpen] = useState(false)
+  const [leaveRequests, setLeaveRequests] = useState<(Member & { projectId: string; projectName: string })[]>([])
+  const [leaveRequestsOpen, setLeaveRequestsOpen] = useState(false)
 
   const isAdmin = role === 'ADMIN'
   const isTeamLeader = role === 'TEAM_LEADER'
@@ -141,11 +143,28 @@ export function ProjectsClient({ role, userId }: { role: string; userId: string 
       .catch(() => {})
   }, [isAdmin])
 
+  const fetchLeaveRequests = useCallback(() => {
+    if (!isAdmin) return
+    fetch('/api/projects?scope=pending-leaders')
+      .then((r) => r.json())
+      .then((d) => {
+        const all = d.projects || []
+        const pending: (Member & { projectId: string; projectName: string })[] = []
+        all.forEach((p: Project) => {
+          p.members?.forEach((m: Member) => {
+            if (m.status === 'LEAVE_REQUESTED') pending.push({ ...m, projectId: p.id, projectName: p.name })
+          })
+        })
+        setLeaveRequests(pending)
+      })
+      .catch(() => {})
+  }, [isAdmin])
+
   useEffect(() => {
     fetchProjects()
     fetch('/api/users').then((r) => r.json()).then((d) => setAllUsers(d.users || [])).catch(() => {})
-    if (isAdmin) { fetchProposals(); fetchPendingLeaders() }
-  }, [fetchProjects, fetchProposals, fetchPendingLeaders, isAdmin])
+    if (isAdmin) { fetchProposals(); fetchPendingLeaders(); fetchLeaveRequests() }
+  }, [fetchProjects, fetchProposals, fetchPendingLeaders, fetchLeaveRequests, isAdmin])
 
   async function handleCreate() {
     if (!createName) return
@@ -226,6 +245,7 @@ export function ProjectsClient({ role, userId }: { role: string; userId: string 
       if (!res.ok) throw new Error()
       toast.success(approve ? 'Salida aprobada, tareas desasignadas' : 'Solicitud rechazada')
       fetchProjects()
+      fetchLeaveRequests()
     } catch { toast.error('Error al procesar solicitud') }
   }
 
@@ -421,6 +441,9 @@ export function ProjectsClient({ role, userId }: { role: string; userId: string 
               </Button>
               <Button variant="outline" onClick={() => { setPendingLeadersOpen(true); fetchPendingLeaders() }}>
                 Solicitudes ({pendingLeaders.length})
+              </Button>
+              <Button variant="outline" onClick={() => { setLeaveRequestsOpen(true); fetchLeaveRequests() }}>
+                Salidas ({leaveRequests.length})
               </Button>
             </>
           )}
@@ -749,6 +772,26 @@ export function ProjectsClient({ role, userId }: { role: string; userId: string 
                 <div className="flex gap-2 mt-2">
                   <Button size="sm" onClick={() => handleApproveLeader(m.user.id, m.projectId, true)}>Aprobar</Button>
                   <Button size="sm" variant="destructive" onClick={() => handleApproveLeader(m.user.id, m.projectId, false)}>Rechazar</Button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={leaveRequestsOpen} onOpenChange={setLeaveRequestsOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader><DialogTitle>Solicitudes de Salida</DialogTitle></DialogHeader>
+          <div className="py-4 space-y-3">
+            {leaveRequests.length === 0 ? (
+              <p className="text-muted-foreground">No hay solicitudes de salida</p>
+            ) : leaveRequests.map((m, i) => (
+              <div key={i} className="border rounded-lg p-3">
+                <p className="font-medium">{m.user.name}</p>
+                <p className="text-sm text-muted-foreground">{m.projectName || 'Proyecto desconocido'}</p>
+                <div className="flex gap-2 mt-2">
+                  <Button size="sm" onClick={() => handleProcessLeave(m.projectId, m.user.id, true)}>Aceptar</Button>
+                  <Button size="sm" variant="outline" onClick={() => handleProcessLeave(m.projectId, m.user.id, false)}>Rechazar</Button>
                 </div>
               </div>
             ))}
