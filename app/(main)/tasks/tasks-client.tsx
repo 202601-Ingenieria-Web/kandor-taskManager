@@ -19,6 +19,7 @@ import { toast } from 'sonner'
 
 type User = { id: string; name: string; email: string }
 type Assignment = { id: string; user: User }
+type Project = { id: string; name: string; color: string | null }
 type Task = {
   id: string
   title: string
@@ -28,6 +29,7 @@ type Task = {
   dueDate: string | null
   estimatedHours: number | null
   createdAt: string
+  project: Project | null
   assignments: Assignment[]
 }
 
@@ -37,6 +39,7 @@ const priorities = ['LOW', 'MEDIUM', 'HIGH', 'CRITICAL']
 export function TasksClient({ role }: { role: string }) {
   const [tasks, setTasks] = useState<Task[]>([])
   const [users, setUsers] = useState<User[]>([])
+  const [projects, setProjects] = useState<Project[]>([])
   const [open, setOpen] = useState(false)
   const [editing, setEditing] = useState<Task | null>(null)
   const [loading, setLoading] = useState(false)
@@ -47,7 +50,10 @@ export function TasksClient({ role }: { role: string }) {
   const [priority, setPriority] = useState('MEDIUM')
   const [dueDate, setDueDate] = useState('')
   const [estimatedHours, setEstimatedHours] = useState('')
+  const [projectId, setProjectId] = useState('')
   const [assigneeIds, setAssigneeIds] = useState<string[]>([])
+
+  const canManage = role === 'ADMIN' || role === 'TEAM_LEADER'
 
   const fetchTasks = () => {
     fetch('/api/tasks')
@@ -56,18 +62,15 @@ export function TasksClient({ role }: { role: string }) {
       .catch(() => {})
   }
 
-  const fetchUsers = () => {
-    fetch('/api/users')
-      .then((r) => r.json())
-      .then((d) => setUsers(d.users || []))
-      .catch(() => {})
-  }
-
-  useEffect(() => { fetchTasks(); fetchUsers() }, [])
+  useEffect(() => {
+    fetchTasks()
+    fetch('/api/users').then((r) => r.json()).then((d) => setUsers(d.users || [])).catch(() => {})
+    fetch('/api/projects').then((r) => r.json()).then((d) => setProjects(d.projects || [])).catch(() => {})
+  }, [])
 
   function resetForm() {
     setTitle(''); setDescription(''); setStatus('TODO'); setPriority('MEDIUM')
-    setDueDate(''); setEstimatedHours(''); setAssigneeIds([])
+    setDueDate(''); setEstimatedHours(''); setProjectId('__none__'); setAssigneeIds([])
   }
 
   function openEdit(task: Task) {
@@ -78,6 +81,7 @@ export function TasksClient({ role }: { role: string }) {
     setPriority(task.priority)
     setDueDate(task.dueDate ? task.dueDate.split('T')[0] : '')
     setEstimatedHours(task.estimatedHours?.toString() || '')
+    setProjectId(task.project?.id || '__none__')
     setAssigneeIds(task.assignments.map((a) => a.user.id))
     setOpen(true)
   }
@@ -86,10 +90,9 @@ export function TasksClient({ role }: { role: string }) {
     if (!title) return
     setLoading(true)
     try {
-      const body = { title, description, status, priority, dueDate, estimatedHours, assigneeIds }
-      const url = editing ? '/api/tasks' : '/api/tasks'
+      const body = { title, description, status, priority, dueDate, estimatedHours, projectId: projectId === '__none__' ? null : projectId, assigneeIds }
       const method = editing ? 'PUT' : 'POST'
-      const res = await fetch(url, {
+      const res = await fetch('/api/tasks', {
         method,
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(editing ? { id: editing.id, ...body } : body),
@@ -119,17 +122,17 @@ export function TasksClient({ role }: { role: string }) {
     }
   }
 
-  async function handleStatusChange(id: string, newStatus: string) {
+  async function handleFieldChange(id: string, data: Record<string, unknown>) {
     try {
       const res = await fetch('/api/tasks', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id, status: newStatus }),
+        body: JSON.stringify({ id, ...data }),
       })
       if (!res.ok) throw new Error()
       fetchTasks()
     } catch {
-      toast.error('Error al actualizar estado')
+      toast.error('Error al actualizar')
     }
   }
 
@@ -145,6 +148,7 @@ export function TasksClient({ role }: { role: string }) {
           <TableHeader>
             <TableRow>
               <TableHead>Título</TableHead>
+              <TableHead>Proyecto</TableHead>
               <TableHead>Estado</TableHead>
               <TableHead>Prioridad</TableHead>
               <TableHead>Asignados</TableHead>
@@ -157,7 +161,27 @@ export function TasksClient({ role }: { role: string }) {
               <TableRow key={t.id}>
                 <TableCell className="font-medium">{t.title}</TableCell>
                 <TableCell>
-                  <Select value={t.status} onValueChange={(v) => handleStatusChange(t.id, v)}>
+                  {canManage ? (
+                    <Select value={t.project?.id || '__none__'} onValueChange={(v) => handleFieldChange(t.id, { projectId: v === '__none__' ? null : v })}>
+                      <SelectTrigger className="w-40"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="__none__">Sin proyecto</SelectItem>
+                        {projects.map((p) => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  ) : t.project ? (
+                    <span className="inline-flex items-center gap-1.5">
+                      {t.project.color && (
+                        <span className="size-2.5 rounded-full" style={{ backgroundColor: t.project.color }} />
+                      )}
+                      {t.project.name}
+                    </span>
+                  ) : (
+                    <span className="text-muted-foreground">Sin proyecto</span>
+                  )}
+                </TableCell>
+                <TableCell>
+                  <Select value={t.status} onValueChange={(v) => handleFieldChange(t.id, { status: v })}>
                     <SelectTrigger className="w-36"><SelectValue /></SelectTrigger>
                     <SelectContent>
                       {statuses.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
@@ -175,7 +199,7 @@ export function TasksClient({ role }: { role: string }) {
             ))}
             {tasks.length === 0 && (
               <TableRow>
-                <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
+                <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
                   No hay tareas
                 </TableCell>
               </TableRow>
@@ -199,6 +223,25 @@ export function TasksClient({ role }: { role: string }) {
               <FieldLabel htmlFor="desc">Descripción</FieldLabel>
               <Textarea id="desc" value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Descripción opcional" />
             </Field>
+            {canManage ? (
+              <Field>
+                <FieldLabel htmlFor="project">Proyecto</FieldLabel>
+                <Select value={projectId} onValueChange={setProjectId}>
+                  <SelectTrigger><SelectValue placeholder="Sin proyecto" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__none__">Sin proyecto</SelectItem>
+                    {projects.map((p) => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </Field>
+            ) : projectId ? (
+              <Field>
+                <FieldLabel>Proyecto</FieldLabel>
+                <p className="text-sm text-muted-foreground">
+                  {projects.find((p) => p.id === projectId)?.name || 'Sin proyecto'}
+                </p>
+              </Field>
+            ) : null}
             <div className="grid grid-cols-2 gap-4">
               <Field>
                 <FieldLabel htmlFor="status">Estado</FieldLabel>
@@ -225,25 +268,34 @@ export function TasksClient({ role }: { role: string }) {
                 <Input id="dueDate" type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} />
               </Field>
               <Field>
-                <FieldLabel htmlFor="hours">Horas estimadas</FieldLabel>
+                <FieldLabel htmlFor="hours">Esfuerzo estimado</FieldLabel>
                 <Input id="hours" type="number" value={estimatedHours} onChange={(e) => setEstimatedHours(e.target.value)} placeholder="0" />
               </Field>
             </div>
-            <Field>
-              <FieldLabel>Asignados</FieldLabel>
-              <div className="flex flex-wrap gap-2">
-                {users.map((u) => (
-                  <label key={u.id} className="flex items-center gap-1 text-sm">
-                    <input
-                      type="checkbox"
-                      checked={assigneeIds.includes(u.id)}
-                      onChange={(e) => setAssigneeIds(e.target.checked ? [...assigneeIds, u.id] : assigneeIds.filter((id) => id !== u.id))}
-                    />
-                    {u.name}
-                  </label>
-                ))}
-              </div>
-            </Field>
+            {canManage ? (
+              <Field>
+                <FieldLabel>Asignados</FieldLabel>
+                <div className="flex flex-wrap gap-2">
+                  {users.map((u) => (
+                    <label key={u.id} className="flex items-center gap-1 text-sm">
+                      <input
+                        type="checkbox"
+                        checked={assigneeIds.includes(u.id)}
+                        onChange={(e) => setAssigneeIds(e.target.checked ? [...assigneeIds, u.id] : assigneeIds.filter((id) => id !== u.id))}
+                      />
+                      {u.name}
+                    </label>
+                  ))}
+                </div>
+              </Field>
+            ) : assigneeIds.length > 0 ? (
+              <Field>
+                <FieldLabel>Asignados</FieldLabel>
+                <p className="text-sm text-muted-foreground">
+                  {users.filter((u) => assigneeIds.includes(u.id)).map((u) => u.name).join(', ')}
+                </p>
+              </Field>
+            ) : null}
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => { setOpen(false); setEditing(null); resetForm() }}>Cancelar</Button>
