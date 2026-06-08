@@ -1,5 +1,8 @@
-import { verifySession, getUser } from '@/lib/dal'
-import prisma from '@/lib/prisma'
+'use client'
+
+import { useEffect, useState } from 'react'
+import { Spinner } from '@/components/ui/spinner'
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, LineChart, Line, Legend, CartesianGrid } from 'recharts'
 
 const statusLabels: Record<string, string> = {
   BACKLOG: 'Backlog', TODO: 'Por Hacer', IN_PROGRESS: 'En Progreso',
@@ -15,34 +18,58 @@ const statusColors: Record<string, string> = {
 }
 
 const statusIcons: Record<string, string> = {
-  BACKLOG: '📋',
-  TODO: '📝',
-  IN_PROGRESS: '⚡',
-  REVIEW: '🔍',
-  DONE: '✅',
+  BACKLOG: '📋', TODO: '📝', IN_PROGRESS: '⚡', REVIEW: '🔍', DONE: '✅',
 }
 
-export default async function DashboardPage() {
-  const session = await verifySession()
-  const user = await getUser()
+const chartColors: Record<string, string> = {
+  BACKLOG: '#94a3b8', TODO: '#64748b', IN_PROGRESS: '#f59e0b',
+  REVIEW: '#a855f7', DONE: '#22c55e',
+}
 
-  const taskCounts = await prisma.task.groupBy({
-    by: ['status'],
-    where: { deleted: false },
-    _count: true,
+const allStatuses = ['BACKLOG', 'TODO', 'IN_PROGRESS', 'REVIEW', 'DONE']
+
+export default function DashboardPage() {
+  const [data, setData] = useState<any>(null)
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    fetch('/api/dashboard')
+      .then((r) => r.json())
+      .then(setData)
+      .catch(() => {})
+      .finally(() => setLoading(false))
+  }, [])
+
+  if (loading) return <div className="p-6 flex justify-center"><Spinner className="size-8" /></div>
+  if (!data) return <div className="p-6 text-red-500">Error al cargar dashboard</div>
+
+  const { user, totalTasks, statusCounts, tasks, dailyMetrics, title } = data
+
+  // Build status count map for charts
+  const countMap: Record<string, number> = {}
+  statusCounts.forEach((s: any) => { countMap[s.status] = s._count })
+  allStatuses.forEach((s) => { if (!countMap[s]) countMap[s] = 0 })
+
+  const cfdData = [{ name: 'Estado Actual', ...countMap }]
+
+  const cumulativeCompletions: { date: string; completadas: number; acumulado: number }[] = []
+  let cumSum = 0
+  dailyMetrics.forEach((d: any) => {
+    cumSum += d.completed
+    cumulativeCompletions.push({ date: d.date.slice(5), completadas: d.completed, acumulado: cumSum })
   })
-
-  const totalTasks = taskCounts.reduce((sum, t) => sum + t._count, 0)
 
   return (
     <div className="p-6 lg:p-8 space-y-8">
+      {/* Header */}
       <div>
         <h1 className="text-3xl font-bold text-gray-900">
           Bienvenido, <span className="text-teal-600">{user?.name}</span>
         </h1>
-        <p className="text-gray-500 mt-1">Rol: {session.role}</p>
+        <p className="text-gray-500 mt-1">{title}</p>
       </div>
 
+      {/* Status Cards */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
           <div className="flex items-center justify-between">
@@ -56,19 +83,89 @@ export default async function DashboardPage() {
           </div>
         </div>
 
-        {taskCounts.map((t) => (
-          <div key={t.status} className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+        {allStatuses.map((st) => (
+          <div key={st} className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-500">{statusLabels[t.status] || t.status}</p>
-                <p className="text-3xl font-bold text-gray-900 mt-1">{t._count}</p>
+                <p className="text-sm font-medium text-gray-500">{statusLabels[st]}</p>
+                <p className="text-3xl font-bold text-gray-900 mt-1">{countMap[st]}</p>
               </div>
-              <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${statusColors[t.status] || 'bg-gray-100'}`}>
-                <span className="text-xl">{statusIcons[t.status] || '📋'}</span>
+              <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${statusColors[st]}`}>
+                <span className="text-xl">{statusIcons[st]}</span>
               </div>
             </div>
           </div>
         ))}
+      </div>
+
+      {/* My Tasks (MEMBER) / Team Tasks (TEAM_LEADER) */}
+      {tasks.length > 0 && (
+        <div>
+          <h2 className="text-xl font-semibold text-gray-900 mb-3">{title}</h2>
+          <div className="space-y-2">
+            {tasks.slice(0, 10).map((t: any) => (
+              <div key={t.id} className="bg-white rounded-lg border border-gray-100 p-3 flex items-center justify-between">
+                <div className="flex items-center gap-3 min-w-0">
+                  <span className={`size-2 rounded-full ${statusColors[t.status]?.split(' ')[0] || 'bg-gray-300'}`} />
+                  <span className="font-medium truncate">{t.title}</span>
+                  {t.project && (
+                    <span className="text-xs text-gray-400 truncate" style={t.project.color ? { color: t.project.color } : {}}>
+                      {t.project.name}
+                    </span>
+                  )}
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
+                  <span className={`text-xs px-2 py-0.5 rounded-full ${statusColors[t.status]}`}>
+                    {statusLabels[t.status] || t.status}
+                  </span>
+                  <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+                    t.priority === 'URGENT' ? 'bg-red-100 text-red-700' :
+                    t.priority === 'HIGH' ? 'bg-orange-100 text-orange-700' :
+                    'bg-gray-100 text-gray-600'
+                  }`}>
+                    {t.priority}
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Charts */}
+      <div className="grid gap-6 lg:grid-cols-2">
+        {/* CFD - Current status snapshot */}
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+          <h3 className="text-lg font-semibold text-gray-900 mb-4">Tareas por Estado (CFD)</h3>
+          <ResponsiveContainer width="100%" height={280}>
+            <BarChart data={cfdData}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+              <XAxis dataKey="name" tick={{ fontSize: 12 }} />
+              <YAxis allowDecimals={false} tick={{ fontSize: 12 }} />
+              <Tooltip />
+              <Legend />
+              {allStatuses.map((s) => (
+                <Bar key={s} dataKey={s} name={statusLabels[s]} fill={chartColors[s]} stackId="a" />
+              ))}
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+
+        {/* Burndown - Completed per day */}
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+          <h3 className="text-lg font-semibold text-gray-900 mb-4">Tareas Completadas / Día (Burndown)</h3>
+          <ResponsiveContainer width="100%" height={280}>
+            <LineChart data={cumulativeCompletions}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+              <XAxis dataKey="date" tick={{ fontSize: 10 }} interval="preserveStartEnd" />
+              <YAxis allowDecimals={false} tick={{ fontSize: 12 }} />
+              <Tooltip />
+              <Legend />
+              <Line type="monotone" dataKey="completadas" name="Completadas" stroke="#14b8a6" strokeWidth={2} dot={{ r: 3 }} activeDot={{ r: 5 }} />
+              <Line type="monotone" dataKey="acumulado" name="Acumulado" stroke="#0f172a" strokeWidth={2} dot={{ r: 3 }} activeDot={{ r: 5 }} />
+            </LineChart>
+          </ResponsiveContainer>
+        </div>
       </div>
     </div>
   )
