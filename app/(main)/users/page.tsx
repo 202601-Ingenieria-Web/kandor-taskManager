@@ -17,12 +17,17 @@ export default async function UsersPage() {
   })
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-6 lg:p-8 space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold">Gestión de Usuarios</h1>
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900">Gestión de Usuarios</h1>
+          <p className="text-gray-500 mt-1">Administra los usuarios del sistema</p>
+        </div>
         <CreateUserDialog />
       </div>
-      <UsersTable users={users} />
+      <div className="bg-white rounded-2xl shadow-sm border border-gray-100">
+        <UsersTable users={users} />
+      </div>
     </div>
   )
 }

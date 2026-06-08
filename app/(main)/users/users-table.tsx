@@ -23,6 +23,12 @@ type User = {
   enabled: boolean
 }
 
+const roleColors: Record<string, string> = {
+  ADMIN: 'bg-purple-100 text-purple-700',
+  TEAM_LEADER: 'bg-blue-100 text-blue-700',
+  MEMBER: 'bg-gray-100 text-gray-700',
+}
+
 export function UsersTable({ users: initialUsers }: { users: User[] }) {
   const [users, setUsers] = useState(initialUsers)
   const [editing, setEditing] = useState<User | null>(null)
@@ -51,28 +57,32 @@ export function UsersTable({ users: initialUsers }: { users: User[] }) {
 
   return (
     <>
-      <div className="border rounded-lg">
+      <div className="p-4">
         <Table>
           <TableHeader>
-            <TableRow>
-              <TableHead>ID</TableHead>
-              <TableHead>Nombre</TableHead>
-              <TableHead>Email</TableHead>
-              <TableHead>Rol</TableHead>
-              <TableHead>Creado</TableHead>
-              <TableHead>Acciones</TableHead>
+            <TableRow className="border-b border-gray-100">
+              <TableHead className="text-gray-500 font-medium">ID</TableHead>
+              <TableHead className="text-gray-500 font-medium">Nombre</TableHead>
+              <TableHead className="text-gray-500 font-medium">Email</TableHead>
+              <TableHead className="text-gray-500 font-medium">Rol</TableHead>
+              <TableHead className="text-gray-500 font-medium">Creado</TableHead>
+              <TableHead className="text-gray-500 font-medium">Acciones</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {users.map((user) => (
-              <TableRow key={user.id}>
-                <TableCell className="font-mono text-xs">{user.id.slice(0, 8)}...</TableCell>
-                <TableCell>{user.name}</TableCell>
-                <TableCell>{user.email}</TableCell>
-                <TableCell>{user.role}</TableCell>
-                <TableCell>{new Date(user.createdAt).toLocaleDateString()}</TableCell>
+              <TableRow key={user.id} className="border-b border-gray-50 hover:bg-gray-50/50">
+                <TableCell className="font-mono text-xs text-gray-400">{user.id.slice(0, 8)}...</TableCell>
+                <TableCell className="font-medium text-gray-900">{user.name}</TableCell>
+                <TableCell className="text-gray-600">{user.email}</TableCell>
                 <TableCell>
-                  <Button variant="outline" size="sm" onClick={() => { setEditing(user); setNewRole(user.role) }}>
+                  <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${roleColors[user.role] || 'bg-gray-100 text-gray-700'}`}>
+                    {user.role}
+                  </span>
+                </TableCell>
+                <TableCell className="text-gray-500">{new Date(user.createdAt).toLocaleDateString()}</TableCell>
+                <TableCell>
+                  <Button variant="outline" size="sm" className="border-gray-200 text-gray-700 hover:bg-gray-50" onClick={() => { setEditing(user); setNewRole(user.role) }}>
                     Editar
                   </Button>
                 </TableCell>
@@ -83,20 +93,20 @@ export function UsersTable({ users: initialUsers }: { users: User[] }) {
       </div>
 
       <Dialog open={!!editing} onOpenChange={(open) => !open && setEditing(null)}>
-        <DialogContent>
+        <DialogContent className="rounded-2xl">
           <DialogHeader>
-            <DialogTitle>Editar Usuario</DialogTitle>
-            <DialogDescription>Actualiza el rol del usuario</DialogDescription>
+            <DialogTitle className="text-xl font-bold text-gray-900">Editar Usuario</DialogTitle>
+            <DialogDescription className="text-gray-500">Actualiza el rol del usuario</DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div>
-              <span className="text-sm text-muted-foreground">Email:</span>
-              <p className="font-medium">{editing?.email}</p>
+              <span className="text-sm text-gray-500">Email:</span>
+              <p className="font-medium text-gray-900">{editing?.email}</p>
             </div>
             <div>
-              <span className="text-sm text-muted-foreground">Nuevo Rol</span>
+              <span className="text-sm text-gray-500">Nuevo Rol</span>
               <Select value={newRole} onValueChange={setNewRole}>
-                <SelectTrigger>
+                <SelectTrigger className="mt-1 border-gray-200">
                   <SelectValue placeholder="Seleccionar rol" />
                 </SelectTrigger>
                 <SelectContent>
@@ -108,8 +118,8 @@ export function UsersTable({ users: initialUsers }: { users: User[] }) {
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setEditing(null)}>Cancelar</Button>
-            <Button onClick={handleUpdateRole} disabled={loading}>
+            <Button variant="outline" className="border-gray-200 text-gray-700 hover:bg-gray-50" onClick={() => setEditing(null)}>Cancelar</Button>
+            <Button className="bg-blue-600 hover:bg-blue-700 text-white" onClick={handleUpdateRole} disabled={loading}>
               {loading ? 'Guardando...' : 'Guardar'}
             </Button>
           </DialogFooter>
