@@ -1,5 +1,5 @@
 import { TooltipProvider } from '@/components/ui/tooltip';
-import { SidebarInset, SidebarProvider } from '@/components/ui/sidebar';
+import { SidebarInset, SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar';
 import { AppSidebar } from '@/components/app-sidebar';
 import { Toaster } from '@/components/ui/sonner';
 import { verifySession } from '@/lib/dal';
@@ -19,6 +19,10 @@ export default async function MainLayout({ children }: { children: React.ReactNo
       >
         <AppSidebar variant="inset" role={session.role} />
         <SidebarInset>
+          <header className="flex items-center h-12 px-4 border-b bg-white lg:hidden">
+            <SidebarTrigger />
+            <span className="ml-2 text-sm font-semibold text-gray-700">Kandor</span>
+          </header>
           {children}
           <Toaster />
         </SidebarInset>

@@ -12,11 +12,11 @@ export default function SignupPage() {
   const [state, action, pending] = useActionState(signup, undefined)
 
   return (
-    <div className="grid min-h-svh lg:grid-cols-[1fr_1fr]">
+    <div className="flex flex-col min-h-svh lg:grid lg:grid-cols-[1fr_1fr]">
       {/* Left side - Signup Form */}
-      <div className="flex items-center justify-center p-8 lg:p-12 bg-white">
+      <div className="flex items-center justify-center p-6 lg:p-12 bg-white order-2 lg:order-1">
         <div className="w-full max-w-md">
-          <div className="bg-white rounded-2xl shadow-lg border border-gray-100 p-8">
+          <div className="bg-white rounded-2xl shadow-lg border border-gray-100 p-6 lg:p-8">
             <form action={action} className="flex flex-col gap-6">
               <FieldGroup>
                 <div className="flex flex-col items-center gap-1 text-center">
@@ -77,26 +77,23 @@ export default function SignupPage() {
       </div>
 
       {/* Right side - Branding */}
-      <div className="flex flex-col p-8 lg:p-12 bg-[#0f172a]">
-        {/* Logo */}
-        <div className="flex items-center gap-3 mb-12">
-          <CondorIcon className="w-12 h-12" />
-          <span className="text-xl font-semibold text-white">Kandor</span>
+      <div className="flex flex-col p-6 lg:p-12 bg-[#0f172a] order-1 lg:order-2">
+        <div className="flex items-center gap-3 mb-6 lg:mb-12">
+          <CondorIcon className="w-10 h-10 lg:w-12 lg:h-12" />
+          <span className="text-lg lg:text-xl font-semibold text-white">Kandor</span>
         </div>
 
-        {/* Heading */}
-        <div className="mb-8">
-          <h1 className="text-4xl lg:text-5xl font-bold text-white leading-tight mb-4">
-            Organiza tu trabajo.<br />
+        <div className="mb-6 lg:mb-8">
+          <h1 className="text-2xl lg:text-5xl font-bold text-white leading-tight mb-2 lg:mb-4">
+            <span className="hidden lg:inline">Organiza tu trabajo.<br /></span>
             Cumple tus <span className="text-teal-400">objetivos.</span>
           </h1>
-          <p className="text-gray-400 text-lg max-w-md">
-            Kandor es la forma más sencilla de planificar, organizar y gestionar tus tareas diarias.
+          <p className="text-gray-400 text-sm lg:text-lg max-w-md">
+            Planifica, organiza y gestiona tus tareas.
           </p>
         </div>
 
-        {/* Feature bullets */}
-        <div className="space-y-4 mb-12">
+        <div className="hidden lg:block space-y-4 mb-12">
           <div className="flex items-center gap-3">
             <div className="w-6 h-6 rounded-full bg-teal-500/20 flex items-center justify-center">
               <svg className="w-4 h-4 text-teal-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
@@ -125,8 +122,7 @@ export default function SignupPage() {
           </div>
         </div>
 
-        {/* App Illustration */}
-        <div className="flex-1 flex items-end justify-center relative">
+        <div className="hidden lg:flex flex-1 items-end justify-center relative">
           <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-full max-w-lg">
             <div className="bg-[#1e293b] rounded-2xl shadow-2xl p-6 border border-slate-700">
               <div className="flex items-center gap-2 mb-4">
