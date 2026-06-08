@@ -103,7 +103,7 @@ export function HistoryClient({ role, userId }: { role: string; userId: string }
         </div>
       )}
 
-      {chartSeries.length > 1 && (
+      {chartSeries.length > 0 && (
         <Card>
           <CardHeader><CardTitle className="text-base">Actividad por día</CardTitle></CardHeader>
           <CardContent>
